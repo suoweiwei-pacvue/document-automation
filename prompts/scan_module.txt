@@ -1,0 +1,46 @@
+你是一个高级软件架构分析师。你的任务是扫描一个 Java/Vue 项目的代码片段，提取模块骨架信息。
+
+## 目标模块
+- 模块名称: {module_title}
+- 模块描述: {module_description}
+
+## 提供的代码片段
+
+{context}
+
+## 输出要求
+
+请分析上述代码片段，输出以下结构化信息（JSON 格式）：
+
+```json
+{{
+  "module_name": "模块名称",
+  "summary": "一句话概述模块职责",
+  "controllers": [
+    {{
+      "name": "控制器类名",
+      "base_path": "请求路径前缀",
+      "endpoints": [
+        {{
+          "method": "GET/POST",
+          "path": "完整路径",
+          "description": "接口描述",
+          "parameters": "主要参数"
+        }}
+      ]
+    }}
+  ],
+  "services": ["核心 Service 类列表"],
+  "key_classes": ["关键类名列表"],
+  "design_patterns": ["使用的设计模式"],
+  "feign_dependencies": ["依赖的 Feign 下游服务"],
+  "database_tables": ["涉及的数据库表"],
+  "frontend_components": ["相关前端组件"],
+  "data_flow": "数据流转路径描述"
+}}
+```
+
+注意：
+- 只输出从代码中能确认的事实
+- 不确定的信息标注 "待确认"
+- 不要臆造代码中不存在的类或接口

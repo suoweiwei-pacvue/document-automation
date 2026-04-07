@@ -1,0 +1,48 @@
+"""Embedding model configuration using LiteLLM for gateway compatibility."""
+
+import logging
+from typing import Optional
+
+import numpy as np
+from langchain_core.embeddings import Embeddings
+
+from src.config import Settings
+
+logger = logging.getLogger(__name__)
+
+
+class GatewayEmbeddings(Embeddings):
+    """LiteLLM-compatible embeddings that work with Pacvue LLM Gateway."""
+
+    def __init__(self, model: str, api_key: str, api_base: Optional[str] = None):
+        self.model = model
+        self.api_key = api_key
+        self.api_base = api_base
+
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        import litellm
+        results = []
+        batch_size = 20
+        for i in range(0, len(texts), batch_size):
+            batch = texts[i : i + batch_size]
+            batch = [t[:8000] if len(t) > 8000 else t for t in batch]
+            response = litellm.embedding(
+                model=self.model,
+                input=batch,
+                api_key=self.api_key,
+                api_base=self.api_base,
+            )
+            for item in response.data:
+                results.append(item["embedding"])
+        return results
+
+    def embed_query(self, text: str) -> list[float]:
+        return self.embed_documents([text])[0]
+
+
+def get_embeddings(settings: Settings) -> Embeddings:
+    return GatewayEmbeddings(
+        model=settings.embedding_model,
+        api_key=settings.openai_api_key,
+        api_base=settings.openai_api_base or None,
+    )

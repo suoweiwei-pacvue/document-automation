@@ -1,0 +1,33 @@
+你是一个技术文档审核专家。请对比以下生成的文档与原始代码片段，检验文档的准确性。
+
+## 生成的文档
+{document}
+
+## 相关代码片段
+{code_context}
+
+## 审核要点
+1. API 路径和方法是否与代码中的 @RequestMapping/@GetMapping/@PostMapping 一致
+2. 类名和方法名是否在代码中真实存在
+3. 业务流程描述是否与代码逻辑匹配
+4. 数据模型描述是否与代码中的实体/DTO 一致
+5. 是否存在臆造的信息
+
+## 输出格式
+
+请输出审核结果：
+
+```json
+{{
+  "accuracy_score": 0-100,
+  "issues": [
+    {{
+      "severity": "error/warning/info",
+      "section": "文档章节",
+      "description": "问题描述",
+      "suggestion": "修改建议"
+    }}
+  ],
+  "corrections": "需要修正的文档内容（如果有）"
+}}
+```
