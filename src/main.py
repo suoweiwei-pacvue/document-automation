@@ -10,7 +10,7 @@ from rich.console import Console
 from rich.logging import RichHandler
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
-from src.config import MODULE_DEFINITIONS, Settings
+from src.config import INDEXABLE_SOURCES, MODULE_DEFINITIONS, Settings, SourceType
 
 app = typer.Typer(
     name="document-automation",
@@ -36,10 +36,20 @@ def _get_settings() -> Settings:
     return Settings()
 
 
+def _expand_source(source: Optional[SourceType]) -> list[str]:
+    """Expand a SourceType value into a list of indexable source keys."""
+    if source is None or source == SourceType.ALL:
+        return list(INDEXABLE_SOURCES)
+    if source == SourceType.CONFLUENCE:
+        return [SourceType.CONFLUENCE_TECH.value, SourceType.CONFLUENCE_PRD.value]
+    return [source.value]
+
+
 @app.command()
 def index(
-    source: Optional[str] = typer.Option(
-        None, help="Index specific source: backend, frontend, confluence, or all (default)",
+    source: Optional[SourceType] = typer.Option(
+        None,
+        help="Index specific source: backend, frontend, confluence-tech, confluence-prd, confluence (both), or all (default)",
     ),
     clear: bool = typer.Option(False, help="Clear existing index before indexing"),
     verbose: bool = typer.Option(False, "--verbose", "-v"),
@@ -55,29 +65,40 @@ def index(
         console.print("[yellow]Clearing existing index...[/yellow]")
         store.clear()
 
-    sources_to_index = [source] if source and source != "all" else ["backend", "frontend", "confluence"]
+    sources_to_index = _expand_source(source)
+
+    if source and source != SourceType.ALL and not clear:
+        for st in sources_to_index:
+            console.print(f"[yellow]Clearing old {st} index...[/yellow]")
+            store.clear_by_source(st)
 
     with Progress(
         SpinnerColumn(), TextColumn("[progress.description]{task.description}"), console=console,
     ) as progress:
 
-        if "backend" in sources_to_index:
+        if SourceType.BACKEND.value in sources_to_index:
             task = progress.add_task("Indexing backend code...", total=None)
             docs = _index_backend(settings)
             count = store.add_documents(docs)
             progress.update(task, description=f"Backend: indexed {count} documents")
 
-        if "frontend" in sources_to_index:
+        if SourceType.FRONTEND.value in sources_to_index:
             task = progress.add_task("Indexing frontend code...", total=None)
             docs = _index_frontend(settings)
             count = store.add_documents(docs)
             progress.update(task, description=f"Frontend: indexed {count} documents")
 
-        if "confluence" in sources_to_index:
-            task = progress.add_task("Indexing Confluence docs...", total=None)
-            docs = _index_confluence(settings)
+        if SourceType.CONFLUENCE_TECH.value in sources_to_index:
+            task = progress.add_task("Indexing Confluence tech docs...", total=None)
+            docs = _index_confluence_tech(settings)
             count = store.add_documents(docs)
-            progress.update(task, description=f"Confluence: indexed {count} documents")
+            progress.update(task, description=f"Confluence-tech: indexed {count} documents")
+
+        if SourceType.CONFLUENCE_PRD.value in sources_to_index:
+            task = progress.add_task("Indexing Confluence PRD docs...", total=None)
+            docs = _index_confluence_prd(settings)
+            count = store.add_documents(docs)
+            progress.update(task, description=f"Confluence-prd: indexed {count} documents")
 
     stats = store.get_stats()
     console.print(f"\n[green]Indexing complete. Total documents: {stats['total_documents']}[/green]")
@@ -192,8 +213,14 @@ def stats(verbose: bool = typer.Option(False, "--verbose", "-v")):
 
 def _index_backend(settings: Settings):
     from src.parsing.chunker import chunk_backend_files
-    from src.sources.local_source import collect_files
-    files = collect_files(settings.backend_path)
+    from src.sources.github_source import BACKEND_EXTENSIONS, GitHubSource
+    gh = GitHubSource(
+        token=settings.github_token,
+        owner=settings.github_owner,
+        repo=settings.github_repo_backend,
+        branch=settings.github_backend_branch,
+    )
+    files = gh.collect_files(extensions=BACKEND_EXTENSIONS, source_type="backend")
     return chunk_backend_files(files)
 
 
@@ -204,23 +231,36 @@ def _index_frontend(settings: Settings):
         token=settings.github_token,
         owner=settings.github_owner,
         repo=settings.github_repo_frontend,
-        branch=settings.github_branch,
+        branch=settings.github_frontend_branch,
     )
     files = gh.collect_files()
     return chunk_frontend_files(files)
 
 
-def _index_confluence(settings: Settings):
-    from src.parsing.chunker import chunk_confluence_pages
+def _get_confluence_source(settings: Settings):
     from src.sources.confluence_source import ConfluenceSource
-    conf = ConfluenceSource(
+    return ConfluenceSource(
         url=settings.confluence_url,
         username=settings.confluence_username,
         api_token=settings.confluence_api_token,
     )
+
+
+def _index_confluence_tech(settings: Settings):
+    from src.parsing.chunker import chunk_confluence_pages
+    conf = _get_confluence_source(settings)
     pages = []
-    pages.extend(conf.collect_pages(settings.confluence_tech_page_id, doc_type="tech_review"))
-    pages.extend(conf.collect_pages(settings.confluence_prd_page_id, doc_type="prd"))
+    for page_id in settings.confluence_tech_page_ids:
+        pages.extend(conf.collect_pages(page_id, doc_type="tech_review"))
+    return chunk_confluence_pages(pages)
+
+
+def _index_confluence_prd(settings: Settings):
+    from src.parsing.chunker import chunk_confluence_pages
+    conf = _get_confluence_source(settings)
+    pages = []
+    for page_id in settings.confluence_prd_page_ids:
+        pages.extend(conf.collect_pages(page_id, doc_type="prd"))
     return chunk_confluence_pages(pages)
 
 

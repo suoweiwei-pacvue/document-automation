@@ -1,7 +1,30 @@
+from enum import Enum
 from pathlib import Path
 from typing import Optional
 
 from pydantic_settings import BaseSettings
+
+
+class SourceType(str, Enum):
+    BACKEND = "backend"
+    FRONTEND = "frontend"
+    CONFLUENCE_TECH = "confluence-tech"
+    CONFLUENCE_PRD = "confluence-prd"
+    CONFLUENCE = "confluence"
+    ALL = "all"
+
+
+INDEXABLE_SOURCES: list[str] = [
+    SourceType.BACKEND.value,
+    SourceType.FRONTEND.value,
+    SourceType.CONFLUENCE_TECH.value,
+    SourceType.CONFLUENCE_PRD.value,
+]
+
+DOC_TYPE_TO_SOURCE: dict[str, str] = {
+    "tech_review": SourceType.CONFLUENCE_TECH.value,
+    "prd": SourceType.CONFLUENCE_PRD.value,
+}
 
 
 class Settings(BaseSettings):
@@ -15,9 +38,8 @@ class Settings(BaseSettings):
     github_owner: str = "Pacvue"
     github_repo_frontend: str = "CustomDashboard-modules-web"
     github_repo_backend: str = "custom-dashboard"
-    github_branch: str = "master"
-
-    local_backend_path: str = "/Users/wei/code/pacvue/custom-dashboard"
+    github_frontend_branch: str = "master"
+    github_backend_branch: str = "production"
 
     confluence_url: str = "https://pacvue-enterprise.atlassian.net"
     confluence_username: str = ""
@@ -43,8 +65,12 @@ class Settings(BaseSettings):
         return kwargs
 
     @property
-    def backend_path(self) -> Path:
-        return Path(self.local_backend_path)
+    def confluence_tech_page_ids(self) -> list[str]:
+        return [x.strip() for x in self.confluence_tech_page_id.split(",") if x.strip()]
+
+    @property
+    def confluence_prd_page_ids(self) -> list[str]:
+        return [x.strip() for x in self.confluence_prd_page_id.split(",") if x.strip()]
 
     @property
     def output_path(self) -> Path:

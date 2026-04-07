@@ -1,27 +1,26 @@
 """Unified chunker that coordinates all parsers and produces LangChain Documents."""
 
 import logging
-from typing import Optional
+from typing import Union
 
 from langchain_core.documents import Document
 
-from src.config import Settings
+from src.config import DOC_TYPE_TO_SOURCE, Settings
 from src.parsing.java_parser import parse_java_file
 from src.parsing.markdown_parser import parse_confluence_page
 from src.parsing.vue_parser import parse_js_file, parse_vue_file
 from src.sources.confluence_source import ConfluencePage
 from src.sources.github_source import GitHubFile
-from src.sources.local_source import SourceFile
 
 logger = logging.getLogger(__name__)
 
 
-def chunk_backend_files(files: list[SourceFile]) -> list[Document]:
-    """Convert backend Java files into LangChain Documents."""
+def chunk_backend_files(files: list[GitHubFile]) -> list[Document]:
+    """Convert backend Java/resource files into LangChain Documents."""
     docs: list[Document] = []
     for f in files:
         if f.file_type == "java":
-            chunks = parse_java_file(f.content, f.relative_path)
+            chunks = parse_java_file(f.content, f.path)
             for chunk in chunks:
                 docs.append(Document(
                     page_content=chunk.content,
@@ -29,10 +28,10 @@ def chunk_backend_files(files: list[SourceFile]) -> list[Document]:
                         **chunk.metadata,
                         "source_type": "backend",
                         "module": f.module,
-                        "relative_path": f.relative_path,
+                        "relative_path": f.path,
                     },
                 ))
-        elif f.file_type in ("resource", "pom"):
+        elif f.file_type in ("resource", "pom", "sql"):
             if len(f.content) > 5000:
                 content = f.content[:5000] + "\n# ... (truncated)"
             else:
@@ -41,10 +40,10 @@ def chunk_backend_files(files: list[SourceFile]) -> list[Document]:
                 page_content=content,
                 metadata={
                     "chunk_type": f.file_type,
-                    "name": f.relative_path.rsplit("/", 1)[-1],
+                    "name": f.path.rsplit("/", 1)[-1],
                     "source_type": "backend",
                     "module": f.module,
-                    "relative_path": f.relative_path,
+                    "relative_path": f.path,
                     "language": "yaml" if f.file_type == "resource" else "xml",
                 },
             ))
@@ -99,12 +98,13 @@ def chunk_confluence_pages(pages: list[ConfluencePage]) -> list[Document]:
             page_id=page.page_id,
             doc_type=page.doc_type,
         )
+        source_type = DOC_TYPE_TO_SOURCE.get(page.doc_type, "confluence-tech")
         for chunk in chunks:
             docs.append(Document(
                 page_content=chunk.content,
                 metadata={
                     **chunk.metadata,
-                    "source_type": "confluence",
+                    "source_type": source_type,
                     "url": page.url,
                 },
             ))

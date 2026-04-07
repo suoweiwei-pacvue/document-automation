@@ -53,6 +53,17 @@ class VectorStoreManager:
         except Exception as e:
             logger.warning("Failed to clear collection: %s", e)
 
+    def clear_by_source(self, source_type: str):
+        """Delete documents matching a specific source_type."""
+        try:
+            results = self.store.get(where={"source_type": source_type})
+            ids = results["ids"]
+            if ids:
+                self.store.delete(ids=ids)
+            logger.info("Cleared %d documents with source_type=%s", len(ids), source_type)
+        except Exception as e:
+            logger.warning("Failed to clear source_type=%s: %s", source_type, e)
+
     def get_stats(self) -> dict:
         """Return basic stats about the vector store."""
         try:

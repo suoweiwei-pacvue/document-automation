@@ -32,28 +32,53 @@ class ConfluenceSource:
         self,
         root_page_id: str,
         doc_type: str = "tech_review",
-        max_depth: int = 3,
     ) -> list[ConfluencePage]:
-        """Fetch a page and all its descendants."""
+        """Fetch a page and all its descendants using CQL ancestor query."""
         pages: list[ConfluencePage] = []
-        self._collect_recursive(root_page_id, doc_type, pages, depth=0, max_depth=max_depth)
+
+        self._fetch_and_append(root_page_id, doc_type, pages)
+
+        start = 0
+        limit = 50
+        while True:
+            try:
+                results = self.client.cql(
+                    f"ancestor = {root_page_id} and type = page",
+                    start=start,
+                    limit=limit,
+                    expand="body.storage,version",
+                )
+            except Exception as e:
+                logger.warning("CQL query failed for ancestor=%s: %s", root_page_id, e)
+                break
+
+            items = results.get("results", [])
+            if not items:
+                break
+
+            for item in items:
+                content_obj = item.get("content", item)
+                pid = str(content_obj.get("id", ""))
+                if pid:
+                    self._fetch_and_append(pid, doc_type, pages)
+
+            total = results.get("totalSize", 0)
+            start += limit
+            if start >= total:
+                break
+
         logger.info(
             "Collected %d Confluence pages (type=%s) under page %s",
             len(pages), doc_type, root_page_id,
         )
         return pages
 
-    def _collect_recursive(
+    def _fetch_and_append(
         self,
         page_id: str,
         doc_type: str,
         pages: list[ConfluencePage],
-        depth: int,
-        max_depth: int,
     ):
-        if depth > max_depth:
-            return
-
         try:
             page = self.client.get_page_by_id(
                 page_id,
@@ -80,17 +105,6 @@ class ConfluenceSource:
                 doc_type=doc_type,
                 url=web_url,
             ))
-
-        try:
-            children = self.client.get_page_child_by_type(page_id, type="page", limit=100)
-            for child in children:
-                child_id = child.get("id")
-                if child_id:
-                    self._collect_recursive(
-                        str(child_id), doc_type, pages, depth + 1, max_depth,
-                    )
-        except Exception as e:
-            logger.warning("Failed to get children of page %s: %s", page_id, e)
 
 
 def _html_to_text(html: str) -> str:

@@ -27,35 +27,37 @@ def main():
     gt = s.github_token
     ok = bool(gt and len(gt) > 10)
     print(f"\n2. GITHUB_TOKEN: {gt[:8]}...{gt[-4:]} ({len(gt)} chars) {'✅' if ok else '❌'}")
+    print(f"   Backend: {s.github_owner}/{s.github_repo_backend}@{s.github_backend_branch}")
+    print(f"   Frontend: {s.github_owner}/{s.github_repo_frontend}@{s.github_frontend_branch}")
     all_ok &= ok
 
-    # 3. Local backend
-    exists = Path(s.local_backend_path).is_dir()
-    print(f"\n3. LOCAL_BACKEND_PATH: {s.local_backend_path} {'✅' if exists else '❌'}")
-    all_ok &= exists
-
-    # 4. Confluence
+    # 3. Confluence
     ct = s.confluence_api_token
     ok = bool(ct and len(ct) > 5)
-    print(f"\n4. CONFLUENCE_API_TOKEN: {ct[:8]}...{ct[-4:]} ({len(ct)} chars) {'✅' if ok else '❌'}" if ok else f"\n4. CONFLUENCE_API_TOKEN: ❌ 未设置")
+    print(f"\n3. CONFLUENCE_API_TOKEN: {ct[:8]}...{ct[-4:]} ({len(ct)} chars) {'✅' if ok else '❌'}" if ok else f"\n3. CONFLUENCE_API_TOKEN: ❌ 未设置")
     all_ok &= ok
 
     print("\n" + "=" * 50)
     print("=== 连通性测试 ===\n")
 
-    # Test 1: Local backend
-    from src.sources.local_source import collect_files
-    files = collect_files(Path(s.local_backend_path), modules=["custom-dashboard-api"])
-    java_count = sum(1 for f in files if f.file_type == "java")
-    print(f"1. 本地后端: {len(files)} 文件 (Java {java_count}) ✅")
-
-    # Test 2: GitHub
-    print("2. GitHub: 连接中...", end=" ", flush=True)
+    # Test 1: GitHub Backend
+    print("1. GitHub 后端代码: 连接中...", end=" ", flush=True)
     try:
         from src.sources.github_source import GitHubSource
-        gh = GitHubSource(s.github_token, s.github_owner, s.github_repo_frontend, s.github_branch)
-        repo = gh.repo
-        print(f"\n   {repo.full_name} (stars: {repo.stargazers_count}) ✅")
+        gh_be = GitHubSource(s.github_token, s.github_owner, s.github_repo_backend, s.github_backend_branch)
+        repo_be = gh_be.repo
+        print(f"\n   {repo_be.full_name}@{s.github_backend_branch} ✅")
+    except Exception as e:
+        print(f"\n   ❌ {e}")
+        all_ok = False
+
+    # Test 2: GitHub Frontend
+    print("2. GitHub 前端代码: 连接中...", end=" ", flush=True)
+    try:
+        from src.sources.github_source import GitHubSource
+        gh_fe = GitHubSource(s.github_token, s.github_owner, s.github_repo_frontend, s.github_frontend_branch)
+        repo_fe = gh_fe.repo
+        print(f"\n   {repo_fe.full_name}@{s.github_frontend_branch} ✅")
     except Exception as e:
         print(f"\n   ❌ {e}")
         all_ok = False
@@ -65,10 +67,50 @@ def main():
     try:
         from src.sources.confluence_source import ConfluenceSource
         conf = ConfluenceSource(s.confluence_url, s.confluence_username, s.confluence_api_token)
-        page = conf.client.get_page_by_id(s.confluence_tech_page_id, expand="version")
-        print(f'\n   技术文档: "{page["title"]}" ✅')
-        page2 = conf.client.get_page_by_id(s.confluence_prd_page_id, expand="version")
-        print(f'   PRD 文档: "{page2["title"]}" ✅')
+
+        def _list_root_and_descendants(client, page_id, label):
+            """List root page + all descendants via CQL ancestor query."""
+            count = 0
+            try:
+                root = client.get_page_by_id(page_id, expand="version")
+                print(f'\n   {label} [{page_id}]: "{root["title"]}" ✅')
+                count += 1
+            except Exception as e:
+                print(f'\n   {label} [{page_id}]: ❌ {e}')
+                return 0
+
+            start = 0
+            limit = 50
+            while True:
+                try:
+                    results = client.cql(
+                        f"ancestor = {page_id} and type = page",
+                        start=start, limit=limit,
+                    )
+                except Exception as e:
+                    print(f'     ⚠️ CQL 查询失败: {e}')
+                    break
+                items = results.get("results", [])
+                if not items:
+                    break
+                for item in items:
+                    c = item.get("content", item)
+                    title = c.get("title", "")
+                    print(f'     └─ "{title}"')
+                    count += 1
+                total = results.get("totalSize", 0)
+                start += limit
+                if start >= total:
+                    break
+            return count
+
+        tech_count = 0
+        for pid in s.confluence_tech_page_ids:
+            tech_count += _list_root_and_descendants(conf.client, pid, "技术文档")
+        prd_count = 0
+        for pid in s.confluence_prd_page_ids:
+            prd_count += _list_root_and_descendants(conf.client, pid, "PRD 文档")
+        print(f'   共计: 技术文档 {tech_count} 页, PRD 文档 {prd_count} 页')
     except Exception as e:
         print(f"\n   ❌ {e}")
         all_ok = False

@@ -1,4 +1,4 @@
-"""GitHub source for fetching frontend code via GitHub API."""
+"""GitHub source for fetching code via GitHub API (frontend and backend)."""
 
 import base64
 import logging
@@ -10,14 +10,16 @@ from pydantic import BaseModel
 logger = logging.getLogger(__name__)
 
 FRONTEND_EXTENSIONS = {".vue", ".js", ".ts", ".jsx", ".tsx", ".scss", ".css", ".json"}
-SKIP_DIRS = {"node_modules", "dist", ".git", "coverage", ".husky"}
+BACKEND_EXTENSIONS = {".java", ".xml", ".yml", ".yaml", ".properties", ".sql"}
+SKIP_DIRS = {"node_modules", "dist", ".git", "coverage", ".husky", "target", "build", ".idea", ".gradle"}
 
 
 class GitHubFile(BaseModel):
     path: str
     content: str
-    file_type: str  # "vue", "js", "ts", "scss", "json"
+    file_type: str
     source_type: str = "frontend"
+    module: str = ""
     size: int = 0
 
 
@@ -39,8 +41,20 @@ class GitHubSource:
         self,
         target_dirs: Optional[list[str]] = None,
         max_file_size: int = 200_000,
+        extensions: Optional[set[str]] = None,
+        source_type: str = "frontend",
     ) -> list[GitHubFile]:
-        """Fetch files from the GitHub repository."""
+        """Fetch files from the GitHub repository.
+
+        Args:
+            target_dirs: Only include files under these top-level directories.
+            max_file_size: Skip files larger than this (bytes).
+            extensions: File extensions to include. Defaults to FRONTEND_EXTENSIONS.
+            source_type: Tag for metadata ("frontend" or "backend").
+        """
+        if extensions is None:
+            extensions = FRONTEND_EXTENSIONS
+
         files: list[GitHubFile] = []
         try:
             tree = self.repo.get_git_tree(self.branch, recursive=True)
@@ -55,7 +69,7 @@ class GitHubSource:
                 continue
 
             ext = "." + item.path.rsplit(".", 1)[-1] if "." in item.path else ""
-            if ext not in FRONTEND_EXTENSIONS:
+            if ext not in extensions:
                 continue
 
             if target_dirs and "*" not in target_dirs:
@@ -67,17 +81,22 @@ class GitHubSource:
                 logger.warning("Skipping large file %s (%d bytes)", item.path, item.size)
                 continue
 
+            module = _extract_module(item.path) if source_type == "backend" else ""
+
             content = self._fetch_content(item.path)
             if content is not None:
-                file_type = ext.lstrip(".")
+                file_type = _classify_file_type(ext)
                 files.append(GitHubFile(
                     path=item.path,
                     content=content,
                     file_type=file_type,
+                    source_type=source_type,
+                    module=module,
                     size=item.size or len(content),
                 ))
 
-        logger.info("Collected %d frontend files from GitHub", len(files))
+        logger.info("Collected %d %s files from GitHub (%s/%s@%s)",
+                     len(files), source_type, self.owner, self.repo_name, self.branch)
         return files
 
     def _fetch_content(self, path: str) -> Optional[str]:
@@ -92,3 +111,24 @@ class GitHubSource:
         except Exception as e:
             logger.warning("Error decoding %s: %s", path, e)
             return None
+
+
+def _extract_module(path: str) -> str:
+    """Extract Maven module name from file path (first directory level)."""
+    parts = path.split("/")
+    if len(parts) >= 2:
+        return parts[0]
+    return "root"
+
+
+def _classify_file_type(ext: str) -> str:
+    ext = ext.lstrip(".")
+    mapping = {
+        "java": "java",
+        "xml": "pom" if ext == "xml" else "resource",
+        "yml": "resource",
+        "yaml": "resource",
+        "properties": "resource",
+        "sql": "sql",
+    }
+    return mapping.get(ext, ext)
