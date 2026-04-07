@@ -8,7 +8,6 @@ build/
 *.egg
 .env
 chroma_db/
-output/*.md
 !output/.gitkeep
 .venv/
 venv/
