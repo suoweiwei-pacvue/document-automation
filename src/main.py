@@ -69,7 +69,7 @@ def index(
 
     sources_to_index = _expand_source(source)
 
-    if source and source != SourceType.ALL and not clear:
+    if not clear:
         for st in sources_to_index:
             console.print(f"[yellow]Clearing old {st} index...[/yellow]")
             store.clear_by_source(st)

@@ -54,13 +54,19 @@ class VectorStoreManager:
             logger.warning("Failed to clear collection: %s", e)
 
     def clear_by_source(self, source_type: str):
-        """Delete documents matching a specific source_type."""
+        """Delete all documents matching a specific source_type."""
+        total_deleted = 0
         try:
-            results = self.store.get(where={"source_type": source_type})
-            ids = results["ids"]
-            if ids:
+            while True:
+                results = self.store.get(
+                    where={"source_type": source_type}, limit=5000,
+                )
+                ids = results["ids"]
+                if not ids:
+                    break
                 self.store.delete(ids=ids)
-            logger.info("Cleared %d documents with source_type=%s", len(ids), source_type)
+                total_deleted += len(ids)
+            logger.info("Cleared %d documents with source_type=%s", total_deleted, source_type)
         except Exception as e:
             logger.warning("Failed to clear source_type=%s: %s", source_type, e)
 

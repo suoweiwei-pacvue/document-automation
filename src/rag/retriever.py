@@ -59,7 +59,8 @@ class MultiSourceRetriever:
             (keywords[:3], None),
             (keywords[:3], ["backend"]),
             (keywords[:3], ["frontend"]),
-            (keywords[:3], ["confluence"]),
+            (keywords[:3], ["confluence-tech"]),
+            (keywords[:3], ["confluence-prd"]),
             (keywords[:3], ["figma"]),
         ]
 

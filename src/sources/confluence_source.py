@@ -126,7 +126,13 @@ class ConfluenceSource:
         page_id: str,
         doc_type: str,
         pages: list[ConfluencePage],
+        seen_ids: set[str] | None = None,
     ):
+        if seen_ids is not None and page_id in seen_ids:
+            return
+        if seen_ids is not None:
+            seen_ids.add(page_id)
+
         try:
             page = self.client.get_page_by_id(
                 page_id,

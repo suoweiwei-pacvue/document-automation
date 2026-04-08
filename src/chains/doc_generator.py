@@ -37,15 +37,13 @@ def generate_module_doc(
     prd_docs = retriever.retrieve(
         query=f"{module_def['title']} {' '.join(keywords[:3])}",
         k=8,
-        source_types=["confluence"],
-        doc_type_filter="prd",
+        source_types=["confluence-prd"],
     )
 
     tech_docs = retriever.retrieve(
         query=f"{module_def['title']} {' '.join(keywords[:3])}",
         k=8,
-        source_types=["confluence"],
-        doc_type_filter="tech_review",
+        source_types=["confluence-tech"],
     )
 
     figma_docs = retriever.retrieve(
@@ -54,10 +52,10 @@ def generate_module_doc(
         source_types=["figma"],
     )
 
-    code_context = _format_docs(code_docs, max_chars=15000)
-    prd_context = _format_docs(prd_docs, max_chars=8000)
-    tech_context = _format_docs(tech_docs, max_chars=8000)
-    figma_context = _format_docs(figma_docs, max_chars=5000)
+    code_context = _format_docs(code_docs, max_chars=20000)
+    prd_context = _format_docs(prd_docs, max_chars=10000)
+    tech_context = _format_docs(tech_docs, max_chars=10000)
+    figma_context = _format_docs(figma_docs, max_chars=6000)
 
     skeleton_str = json.dumps(skeleton, ensure_ascii=False, indent=2, default=str)
     if len(skeleton_str) > 5000:
@@ -76,7 +74,7 @@ def generate_module_doc(
     llm = ChatOpenAI(
         **settings.get_llm_kwargs(),
         temperature=0.1,
-        max_tokens=8000,
+        max_tokens=16000,
     )
 
     logger.info("Generating documentation for module: %s", module_key)
