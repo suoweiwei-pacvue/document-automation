@@ -118,23 +118,24 @@ python -m src.main index --source figma
 - `03-share-link.md` - ShareLink 功能
 - `04-data-source.md` - 数据源路由与物料查询
 - `05-chart-types.md` - 各图表类型详解
-- `06-platform-amazon.md` - Amazon 平台
-- `07-platform-walmart.md` - Walmart 平台
-- `08-platform-commerce.md` - Commerce 平台
-- `09-platform-instacart.md` - Instacart 平台
-- `10-platform-criteo.md` - Criteo 平台
-- `11-platform-target.md` - Target 平台
-- `12-platform-kroger.md` - Kroger 平台
-- `13-platform-dsp.md` - DSP 平台
-- `14-platform-chewy.md` - Chewy 平台
-- `15-platform-citrus.md` - Citrus 平台
-- `16-platform-bol.md` - Bol 平台
-- `17-platform-doordash.md` - Doordash 平台
-- `18-platform-samsclub.md` - Sam's Club 平台
-- `19-survey.md` - 用户调查问卷
-- `20-message.md` - 消息通知
-- `21-infra.md` - 基础设施
-- `22-frontend.md` - 前端架构
+- `06-dashboard-setting-filter.md` - Dashboard Setting 过滤条件与绩效影响（Retail/Commerce）
+- `07-platform-amazon.md` - Amazon 平台
+- `08-platform-walmart.md` - Walmart 平台
+- `09-platform-commerce.md` - Commerce 平台
+- `10-platform-instacart.md` - Instacart 平台
+- `11-platform-criteo.md` - Criteo 平台
+- `12-platform-target.md` - Target 平台
+- `13-platform-kroger.md` - Kroger 平台
+- `14-platform-dsp.md` - DSP 平台
+- `15-platform-chewy.md` - Chewy 平台
+- `16-platform-citrus.md` - Citrus 平台
+- `17-platform-bol.md` - Bol 平台
+- `18-platform-doordash.md` - Doordash 平台
+- `19-platform-samsclub.md` - Sam's Club 平台
+- `20-survey.md` - 用户调查问卷
+- `21-message.md` - 消息通知
+- `22-infra.md` - 基础设施
+- `23-frontend.md` - 前端架构
 
 ## 架构
 

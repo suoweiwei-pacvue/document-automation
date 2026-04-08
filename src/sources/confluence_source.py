@@ -39,16 +39,17 @@ class ConfluenceSource:
         get_page_child_by_type if CQL is unavailable (e.g. 500 error).
         """
         pages: list[ConfluencePage] = []
+        seen_ids: set[str] = set()
 
-        self._fetch_and_append(root_page_id, doc_type, pages)
+        self._fetch_and_append(root_page_id, doc_type, pages, seen_ids)
 
-        cql_ok = self._collect_via_cql(root_page_id, doc_type, pages)
+        cql_ok = self._collect_via_cql(root_page_id, doc_type, pages, seen_ids)
         if not cql_ok:
             logger.info(
                 "CQL unavailable, falling back to recursive child-page traversal for %s",
                 root_page_id,
             )
-            self._collect_children_recursive(root_page_id, doc_type, pages)
+            self._collect_children_recursive(root_page_id, doc_type, pages, seen_ids=seen_ids)
 
         logger.info(
             "Collected %d Confluence pages (type=%s) under page %s",
@@ -61,6 +62,7 @@ class ConfluenceSource:
         root_page_id: str,
         doc_type: str,
         pages: list[ConfluencePage],
+        seen_ids: set[str] | None = None,
     ) -> bool:
         """Try to collect descendant pages via CQL. Returns False if CQL fails."""
         start = 0
@@ -85,7 +87,7 @@ class ConfluenceSource:
                 content_obj = item.get("content", item)
                 pid = str(content_obj.get("id", ""))
                 if pid:
-                    self._fetch_and_append(pid, doc_type, pages)
+                    self._fetch_and_append(pid, doc_type, pages, seen_ids)
 
             total = results.get("totalSize", 0)
             start += limit
@@ -101,6 +103,7 @@ class ConfluenceSource:
         pages: list[ConfluencePage],
         max_depth: int = 5,
         depth: int = 0,
+        seen_ids: set[str] | None = None,
     ):
         """Fallback: recursively get child pages when CQL is unavailable."""
         if depth >= max_depth:
@@ -116,9 +119,9 @@ class ConfluenceSource:
         for child in children:
             child_id = str(child.get("id", ""))
             if child_id:
-                self._fetch_and_append(child_id, doc_type, pages)
+                self._fetch_and_append(child_id, doc_type, pages, seen_ids)
                 self._collect_children_recursive(
-                    child_id, doc_type, pages, max_depth, depth + 1,
+                    child_id, doc_type, pages, max_depth, depth + 1, seen_ids,
                 )
 
     def _fetch_and_append(

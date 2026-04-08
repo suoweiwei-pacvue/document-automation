@@ -181,8 +181,30 @@ MODULE_DEFINITIONS = {
             "Table", "GridTable", "WhiteBoard", "extractParam",
         ],
     },
+    "dashboard-setting-filter": {
+        "id": "06-dashboard-setting-filter",
+        "title": "Dashboard Setting 过滤条件与绩效影响（Retail/Commerce）",
+        "description": "Retail(HQ) 与 Commerce 两个平台各自的 Dashboard Setting 物料过滤条件（Campaign/AdGroup/Keyword/ASIN/SKU 等）如何影响最终绩效数据结果。文档内分两大章节分别描述各平台的过滤逻辑、指标计算和数据口径差异",
+        "backend_modules": ["custom-dashboard-commerce", "custom-dashboard-api"],
+        "backend_packages": [
+            "com.pacvue.api.handler.SettingHandler",
+            "com.pacvue.api.handler.CollectorHandler",
+            "com.pacvue.api.strategy",
+            "com.pacvue.api.manager.support.CommerceDatasourceSupport",
+        ],
+        "frontend_dirs": ["dashboardSub", "steps", "components"],
+        "keywords": [
+            "ChartSetting", "SettingHandler", "CollectorHandler",
+            "commerce", "HQ", "vendor", "seller",
+            "retail", "Retail", "CrossRetailer",
+            "filter", "campaign", "adGroup", "keyword",
+            "ASIN", "SKU", "profile", "material",
+            "extractParam", "indicator", "metric",
+            "CommerceReport", "CommerceDatasourceSupport",
+        ],
+    },
     "platform-amazon": {
-        "id": "06-platform-amazon",
+        "id": "07-platform-amazon",
         "title": "Amazon 平台模块",
         "description": "Amazon Advertising / SOV / Product Center 的数据查询与指标映射",
         "backend_modules": ["custom-dashboard-amazon", "custom-dashboard-amazon-rest"],
@@ -193,7 +215,7 @@ MODULE_DEFINITIONS = {
         ],
     },
     "platform-walmart": {
-        "id": "07-platform-walmart",
+        "id": "08-platform-walmart",
         "title": "Walmart 平台模块",
         "description": "Walmart 广告数据查询与指标映射",
         "backend_modules": ["custom-dashboard-walmart"],
@@ -201,7 +223,7 @@ MODULE_DEFINITIONS = {
         "keywords": ["walmart", "WalmartReport"],
     },
     "platform-commerce": {
-        "id": "08-platform-commerce",
+        "id": "09-platform-commerce",
         "title": "Commerce 平台模块",
         "description": "Commerce/Vendor/Seller 数据查询、HQ 迁移",
         "backend_modules": ["custom-dashboard-commerce"],
@@ -209,7 +231,7 @@ MODULE_DEFINITIONS = {
         "keywords": ["commerce", "CommerceReport", "vendor", "seller", "HQ"],
     },
     "platform-instacart": {
-        "id": "09-platform-instacart",
+        "id": "10-platform-instacart",
         "title": "Instacart 平台模块",
         "description": "Instacart 广告数据查询与指标映射",
         "backend_modules": ["custom-dashboard-instacart"],
@@ -217,7 +239,7 @@ MODULE_DEFINITIONS = {
         "keywords": ["instacart", "InstacartReport"],
     },
     "platform-criteo": {
-        "id": "10-platform-criteo",
+        "id": "11-platform-criteo",
         "title": "Criteo 平台模块",
         "description": "Criteo 广告数据查询与指标映射",
         "backend_modules": ["custom-dashboard-criteo"],
@@ -225,7 +247,7 @@ MODULE_DEFINITIONS = {
         "keywords": ["criteo", "CriteoReport"],
     },
     "platform-target": {
-        "id": "11-platform-target",
+        "id": "12-platform-target",
         "title": "Target 平台模块",
         "description": "Target 广告数据查询与指标映射",
         "backend_modules": ["custom-dashboard-target"],
@@ -233,7 +255,7 @@ MODULE_DEFINITIONS = {
         "keywords": ["target", "TargetReport"],
     },
     "platform-kroger": {
-        "id": "12-platform-kroger",
+        "id": "13-platform-kroger",
         "title": "Kroger 平台模块",
         "description": "Kroger 广告数据查询与指标映射",
         "backend_modules": ["custom-dashboard-kroger"],
@@ -241,7 +263,7 @@ MODULE_DEFINITIONS = {
         "keywords": ["kroger", "KrogerReport"],
     },
     "platform-dsp": {
-        "id": "13-platform-dsp",
+        "id": "14-platform-dsp",
         "title": "DSP 平台模块",
         "description": "Amazon DSP 广告数据查询与指标映射",
         "backend_modules": ["custom-dashboard-dsp"],
@@ -249,7 +271,7 @@ MODULE_DEFINITIONS = {
         "keywords": ["dsp", "DspReport", "DSP"],
     },
     "platform-chewy": {
-        "id": "14-platform-chewy",
+        "id": "15-platform-chewy",
         "title": "Chewy 平台模块",
         "description": "Chewy 广告数据查询与指标映射",
         "backend_modules": ["custom-dashboard-chewy"],
@@ -257,7 +279,7 @@ MODULE_DEFINITIONS = {
         "keywords": ["chewy", "ChewyReport"],
     },
     "platform-citrus": {
-        "id": "15-platform-citrus",
+        "id": "16-platform-citrus",
         "title": "Citrus 平台模块",
         "description": "Citrus 广告数据查询与指标映射",
         "backend_modules": ["custom-dashboard-citrus"],
@@ -265,7 +287,7 @@ MODULE_DEFINITIONS = {
         "keywords": ["citrus", "CitrusReport"],
     },
     "platform-bol": {
-        "id": "16-platform-bol",
+        "id": "17-platform-bol",
         "title": "Bol 平台模块",
         "description": "Bol 广告数据查询与指标映射",
         "backend_modules": ["custom-dashboard-bol"],
@@ -273,7 +295,7 @@ MODULE_DEFINITIONS = {
         "keywords": ["bol", "BolReport"],
     },
     "platform-doordash": {
-        "id": "17-platform-doordash",
+        "id": "18-platform-doordash",
         "title": "Doordash 平台模块",
         "description": "Doordash 广告数据查询与指标映射",
         "backend_modules": ["custom-dashboard-doordash"],
@@ -281,7 +303,7 @@ MODULE_DEFINITIONS = {
         "keywords": ["doordash", "DoordashReport"],
     },
     "platform-samsclub": {
-        "id": "18-platform-samsclub",
+        "id": "19-platform-samsclub",
         "title": "Samsclub 平台模块",
         "description": "Sam's Club 广告数据查询与指标映射",
         "backend_modules": ["custom-dashboard-samsclub"],
@@ -289,7 +311,7 @@ MODULE_DEFINITIONS = {
         "keywords": ["samsclub", "SamsclubReport"],
     },
     "survey": {
-        "id": "19-survey",
+        "id": "20-survey",
         "title": "用户调查问卷",
         "description": "用户提交图表类型调查、Admin 查询/导出",
         "backend_modules": ["custom-dashboard-api"],
@@ -298,7 +320,7 @@ MODULE_DEFINITIONS = {
         "keywords": ["survey", "questionnaire"],
     },
     "message": {
-        "id": "20-message",
+        "id": "21-message",
         "title": "消息通知模块",
         "description": "消息推送与通知管理",
         "backend_modules": ["custom-dashboard-message"],
@@ -306,7 +328,7 @@ MODULE_DEFINITIONS = {
         "keywords": ["message", "notification", "kafka"],
     },
     "infra": {
-        "id": "21-infra",
+        "id": "22-infra",
         "title": "基础设施",
         "description": "认证鉴权/Feign 配置/缓存策略/异常处理/MyBatis-Plus/部署/CI-CD",
         "backend_modules": ["custom-dashboard-web-base", "custom-dashboard-feign"],
@@ -317,7 +339,7 @@ MODULE_DEFINITIONS = {
         ],
     },
     "frontend": {
-        "id": "22-frontend",
+        "id": "23-frontend",
         "title": "前端架构",
         "description": "Vue 组件结构/路由/Store 状态管理/API 层/样式体系",
         "backend_modules": [],
