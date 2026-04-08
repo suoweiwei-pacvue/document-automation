@@ -60,6 +60,7 @@ class MultiSourceRetriever:
             (keywords[:3], ["backend"]),
             (keywords[:3], ["frontend"]),
             (keywords[:3], ["confluence"]),
+            (keywords[:3], ["figma"]),
         ]
 
         for kw_group, source_types in query_groups:

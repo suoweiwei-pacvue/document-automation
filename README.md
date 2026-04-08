@@ -2,7 +2,7 @@
 
 基于 RAG + LangChain 的知识库文档自动生成工具，专为 Pacvue Custom Dashboard 项目设计。
 
-融合四个数据源（后端代码、前端代码、技术评审文档、PRD 文档），按业务模块自动生成结构化 Markdown 知识库文档。
+融合五个数据源（后端代码、前端代码、技术评审文档、PRD 文档、Figma 设计稿），按业务模块自动生成结构化 Markdown 知识库文档。
 
 ## 快速开始
 
@@ -56,7 +56,7 @@ python -m src.main index --clear
 
 ## 数据源
 
-系统从 4 个独立数据源采集信息，每个数据源可单独索引和更新：
+系统从 5 个独立数据源采集信息，每个数据源可单独索引和更新：
 
 | `--source` 值 | 数据来源 | 说明 |
 |---|---|---|
@@ -64,13 +64,14 @@ python -m src.main index --clear
 | `frontend` | GitHub `Pacvue/CustomDashboard-modules-web` master 分支 | Vue 前端代码 |
 | `confluence-tech` | Confluence page `2752762` 子页面 | 技术评审文档 |
 | `confluence-prd` | Confluence page `3441902` 子页面 | PRD 产品需求文档 |
+| `figma` | Figma file `2sKAoYhrKF3G8ZLiumT1rc` | UI 设计稿（页面结构、组件、文本、评论） |
 
 此外还有两个快捷别名：
 
 | 别名 | 等价于 |
 |---|---|
 | `confluence` | `confluence-tech` + `confluence-prd` |
-| `all`（默认） | 全部 4 个数据源 |
+| `all`（默认） | 全部 5 个数据源 |
 
 ## 增量更新
 
@@ -93,6 +94,9 @@ python -m src.main index --source confluence
 # 前端代码变了 —— 只重建前端索引，再生成前端架构文档
 python -m src.main index --source frontend
 python -m src.main generate --module frontend
+
+# Figma 设计稿更新了 —— 只重建 Figma 索引
+python -m src.main index --source figma
 ```
 
 ### 典型工作流
@@ -117,11 +121,20 @@ python -m src.main generate --module frontend
 - `06-platform-amazon.md` - Amazon 平台
 - `07-platform-walmart.md` - Walmart 平台
 - `08-platform-commerce.md` - Commerce 平台
-- `09-platform-others.md` - 其他平台
-- `10-survey.md` - 用户调查问卷
-- `11-message.md` - 消息通知
-- `12-infra.md` - 基础设施
-- `13-frontend.md` - 前端架构
+- `09-platform-instacart.md` - Instacart 平台
+- `10-platform-criteo.md` - Criteo 平台
+- `11-platform-target.md` - Target 平台
+- `12-platform-kroger.md` - Kroger 平台
+- `13-platform-dsp.md` - DSP 平台
+- `14-platform-chewy.md` - Chewy 平台
+- `15-platform-citrus.md` - Citrus 平台
+- `16-platform-bol.md` - Bol 平台
+- `17-platform-doordash.md` - Doordash 平台
+- `18-platform-samsclub.md` - Sam's Club 平台
+- `19-survey.md` - 用户调查问卷
+- `20-message.md` - 消息通知
+- `21-infra.md` - 基础设施
+- `22-frontend.md` - 前端架构
 
 ## 架构
 

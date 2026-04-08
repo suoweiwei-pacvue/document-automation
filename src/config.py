@@ -11,6 +11,7 @@ class SourceType(str, Enum):
     CONFLUENCE_TECH = "confluence-tech"
     CONFLUENCE_PRD = "confluence-prd"
     CONFLUENCE = "confluence"
+    FIGMA = "figma"
     ALL = "all"
 
 
@@ -19,6 +20,7 @@ INDEXABLE_SOURCES: list[str] = [
     SourceType.FRONTEND.value,
     SourceType.CONFLUENCE_TECH.value,
     SourceType.CONFLUENCE_PRD.value,
+    SourceType.FIGMA.value,
 ]
 
 DOC_TYPE_TO_SOURCE: dict[str, str] = {
@@ -44,8 +46,11 @@ class Settings(BaseSettings):
     confluence_url: str = "https://pacvue-enterprise.atlassian.net"
     confluence_username: str = ""
     confluence_api_token: str = ""
-    confluence_tech_page_id: str = "2752762"
+    confluence_tech_page_id: str = "2752762,827458163"
     confluence_prd_page_id: str = "3441902"
+
+    figma_access_token: str = ""
+    figma_file_ids: str = ""
 
     chroma_persist_dir: str = "./chroma_db"
     chroma_collection_name: str = "cd_knowledge_base"
@@ -71,6 +76,10 @@ class Settings(BaseSettings):
     @property
     def confluence_prd_page_ids(self) -> list[str]:
         return [x.strip() for x in self.confluence_prd_page_id.split(",") if x.strip()]
+
+    @property
+    def figma_file_id_list(self) -> list[str]:
+        return [x.strip() for x in self.figma_file_ids.split(",") if x.strip()]
 
     @property
     def output_path(self) -> Path:
@@ -199,25 +208,88 @@ MODULE_DEFINITIONS = {
         "frontend_dirs": [],
         "keywords": ["commerce", "CommerceReport", "vendor", "seller", "HQ"],
     },
-    "platform-others": {
-        "id": "09-platform-others",
-        "title": "其他平台模块",
-        "description": "Instacart/Criteo/Target/Kroger/DSP/Chewy/Bol/Doordash/Samsclub",
-        "backend_modules": [
-            "custom-dashboard-instacart", "custom-dashboard-criteo",
-            "custom-dashboard-target", "custom-dashboard-kroger",
-            "custom-dashboard-dsp", "custom-dashboard-chewy",
-            "custom-dashboard-bol", "custom-dashboard-doordash",
-            "custom-dashboard-samsclub",
-        ],
+    "platform-instacart": {
+        "id": "09-platform-instacart",
+        "title": "Instacart 平台模块",
+        "description": "Instacart 广告数据查询与指标映射",
+        "backend_modules": ["custom-dashboard-instacart"],
         "frontend_dirs": [],
-        "keywords": [
-            "instacart", "criteo", "target", "kroger", "dsp",
-            "chewy", "bol", "doordash", "samsclub",
-        ],
+        "keywords": ["instacart", "InstacartReport"],
+    },
+    "platform-criteo": {
+        "id": "10-platform-criteo",
+        "title": "Criteo 平台模块",
+        "description": "Criteo 广告数据查询与指标映射",
+        "backend_modules": ["custom-dashboard-criteo"],
+        "frontend_dirs": [],
+        "keywords": ["criteo", "CriteoReport"],
+    },
+    "platform-target": {
+        "id": "11-platform-target",
+        "title": "Target 平台模块",
+        "description": "Target 广告数据查询与指标映射",
+        "backend_modules": ["custom-dashboard-target"],
+        "frontend_dirs": [],
+        "keywords": ["target", "TargetReport"],
+    },
+    "platform-kroger": {
+        "id": "12-platform-kroger",
+        "title": "Kroger 平台模块",
+        "description": "Kroger 广告数据查询与指标映射",
+        "backend_modules": ["custom-dashboard-kroger"],
+        "frontend_dirs": [],
+        "keywords": ["kroger", "KrogerReport"],
+    },
+    "platform-dsp": {
+        "id": "13-platform-dsp",
+        "title": "DSP 平台模块",
+        "description": "Amazon DSP 广告数据查询与指标映射",
+        "backend_modules": ["custom-dashboard-dsp"],
+        "frontend_dirs": [],
+        "keywords": ["dsp", "DspReport", "DSP"],
+    },
+    "platform-chewy": {
+        "id": "14-platform-chewy",
+        "title": "Chewy 平台模块",
+        "description": "Chewy 广告数据查询与指标映射",
+        "backend_modules": ["custom-dashboard-chewy"],
+        "frontend_dirs": [],
+        "keywords": ["chewy", "ChewyReport"],
+    },
+    "platform-citrus": {
+        "id": "15-platform-citrus",
+        "title": "Citrus 平台模块",
+        "description": "Citrus 广告数据查询与指标映射",
+        "backend_modules": ["custom-dashboard-citrus"],
+        "frontend_dirs": [],
+        "keywords": ["citrus", "CitrusReport"],
+    },
+    "platform-bol": {
+        "id": "16-platform-bol",
+        "title": "Bol 平台模块",
+        "description": "Bol 广告数据查询与指标映射",
+        "backend_modules": ["custom-dashboard-bol"],
+        "frontend_dirs": [],
+        "keywords": ["bol", "BolReport"],
+    },
+    "platform-doordash": {
+        "id": "17-platform-doordash",
+        "title": "Doordash 平台模块",
+        "description": "Doordash 广告数据查询与指标映射",
+        "backend_modules": ["custom-dashboard-doordash"],
+        "frontend_dirs": [],
+        "keywords": ["doordash", "DoordashReport"],
+    },
+    "platform-samsclub": {
+        "id": "18-platform-samsclub",
+        "title": "Samsclub 平台模块",
+        "description": "Sam's Club 广告数据查询与指标映射",
+        "backend_modules": ["custom-dashboard-samsclub"],
+        "frontend_dirs": [],
+        "keywords": ["samsclub", "SamsclubReport"],
     },
     "survey": {
-        "id": "10-survey",
+        "id": "19-survey",
         "title": "用户调查问卷",
         "description": "用户提交图表类型调查、Admin 查询/导出",
         "backend_modules": ["custom-dashboard-api"],
@@ -226,7 +298,7 @@ MODULE_DEFINITIONS = {
         "keywords": ["survey", "questionnaire"],
     },
     "message": {
-        "id": "11-message",
+        "id": "20-message",
         "title": "消息通知模块",
         "description": "消息推送与通知管理",
         "backend_modules": ["custom-dashboard-message"],
@@ -234,7 +306,7 @@ MODULE_DEFINITIONS = {
         "keywords": ["message", "notification", "kafka"],
     },
     "infra": {
-        "id": "12-infra",
+        "id": "21-infra",
         "title": "基础设施",
         "description": "认证鉴权/Feign 配置/缓存策略/异常处理/MyBatis-Plus/部署/CI-CD",
         "backend_modules": ["custom-dashboard-web-base", "custom-dashboard-feign"],
@@ -245,7 +317,7 @@ MODULE_DEFINITIONS = {
         ],
     },
     "frontend": {
-        "id": "13-frontend",
+        "id": "22-frontend",
         "title": "前端架构",
         "description": "Vue 组件结构/路由/Store 状态管理/API 层/样式体系",
         "backend_modules": [],

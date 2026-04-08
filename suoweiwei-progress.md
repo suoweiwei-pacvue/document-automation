@@ -43,6 +43,18 @@
 - [x] `docs/exec-plans/` - 执行计划模板
 - [x] Cursor Skill 创建 (`~/.cursor/skills/document-automation/SKILL.md`)
 
+### Phase 6: Figma 数据源集成
+- [x] `src/sources/figma_source.py` - Figma REST API 采集（文件树遍历 + 评论）
+- [x] `src/config.py` - 新增 SourceType.FIGMA + Settings figma 配置字段
+- [x] `src/parsing/chunker.py` - 新增 chunk_figma_nodes 分块函数
+- [x] `src/main.py` - 新增 _index_figma + CLI index 命令接入
+- [x] `src/rag/retriever.py` - retrieve_for_module 追加 figma 查询组
+- [x] `src/chains/doc_generator.py` - 文档生成融合 Figma 设计上下文
+- [x] `prompts/generate_doc.txt` - Prompt 模板增加 Figma 设计稿部分
+- [x] `.env.example` / `requirements.txt` / `check_config.py` 更新
+- [x] 单元测试新增 Figma 相关测试用例
+- [x] README.md / ARCHITECTURE.md / SKILL.md / writer.py 文档更新
+
 ## 使用说明
 
 ```bash

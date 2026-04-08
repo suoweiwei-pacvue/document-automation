@@ -10,6 +10,7 @@ from src.parsing.java_parser import parse_java_file
 from src.parsing.markdown_parser import parse_confluence_page
 from src.parsing.vue_parser import parse_js_file, parse_vue_file
 from src.sources.confluence_source import ConfluencePage
+from src.sources.figma_source import FigmaNode
 from src.sources.github_source import GitHubFile
 
 logger = logging.getLogger(__name__)
@@ -110,4 +111,32 @@ def chunk_confluence_pages(pages: list[ConfluencePage]) -> list[Document]:
             ))
 
     logger.info("Chunked %d Confluence pages into %d documents", len(pages), len(docs))
+    return docs
+
+
+def chunk_figma_nodes(nodes: list[FigmaNode]) -> list[Document]:
+    """Convert Figma design nodes into LangChain Documents."""
+    docs: list[Document] = []
+    for node in nodes:
+        if not node.content.strip():
+            continue
+
+        content = node.content
+        if len(content) > 5000:
+            content = content[:5000] + "\n... (truncated)"
+
+        docs.append(Document(
+            page_content=content,
+            metadata={
+                "chunk_type": node.node_type.lower(),
+                "name": node.name,
+                "source_type": "figma",
+                "file_key": node.file_key,
+                "file_name": node.file_name,
+                "page_name": node.page_name,
+                "node_id": node.node_id,
+            },
+        ))
+
+    logger.info("Chunked %d Figma nodes into %d documents", len(nodes), len(docs))
     return docs

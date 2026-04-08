@@ -42,6 +42,8 @@ def _expand_source(source: Optional[SourceType]) -> list[str]:
         return list(INDEXABLE_SOURCES)
     if source == SourceType.CONFLUENCE:
         return [SourceType.CONFLUENCE_TECH.value, SourceType.CONFLUENCE_PRD.value]
+    if source == SourceType.FIGMA:
+        return [SourceType.FIGMA.value]
     return [source.value]
 
 
@@ -99,6 +101,12 @@ def index(
             docs = _index_confluence_prd(settings)
             count = store.add_documents(docs)
             progress.update(task, description=f"Confluence-prd: indexed {count} documents")
+
+        if SourceType.FIGMA.value in sources_to_index:
+            task = progress.add_task("Indexing Figma design files...", total=None)
+            docs = _index_figma(settings)
+            count = store.add_documents(docs)
+            progress.update(task, description=f"Figma: indexed {count} documents")
 
     stats = store.get_stats()
     console.print(f"\n[green]Indexing complete. Total documents: {stats['total_documents']}[/green]")
@@ -220,7 +228,13 @@ def _index_backend(settings: Settings):
         repo=settings.github_repo_backend,
         branch=settings.github_backend_branch,
     )
+    console.print(f"  [dim]Repo: {settings.github_owner}/{settings.github_repo_backend}@{settings.github_backend_branch}[/dim]")
     files = gh.collect_files(extensions=BACKEND_EXTENSIONS, source_type="backend")
+    modules = {}
+    for f in files:
+        modules.setdefault(f.module or "root", []).append(f)
+    for mod, mod_files in sorted(modules.items()):
+        console.print(f"  [dim]  └─ {mod}: {len(mod_files)} files[/dim]")
     return chunk_backend_files(files)
 
 
@@ -233,7 +247,14 @@ def _index_frontend(settings: Settings):
         repo=settings.github_repo_frontend,
         branch=settings.github_frontend_branch,
     )
+    console.print(f"  [dim]Repo: {settings.github_owner}/{settings.github_repo_frontend}@{settings.github_frontend_branch}[/dim]")
     files = gh.collect_files()
+    dirs = {}
+    for f in files:
+        top_dir = f.path.split("/")[0] if "/" in f.path else "(root)"
+        dirs.setdefault(top_dir, []).append(f)
+    for d, d_files in sorted(dirs.items()):
+        console.print(f"  [dim]  └─ {d}/: {len(d_files)} files[/dim]")
     return chunk_frontend_files(files)
 
 
@@ -251,7 +272,11 @@ def _index_confluence_tech(settings: Settings):
     conf = _get_confluence_source(settings)
     pages = []
     for page_id in settings.confluence_tech_page_ids:
-        pages.extend(conf.collect_pages(page_id, doc_type="tech_review"))
+        console.print(f"  [dim]Root page: {page_id}[/dim]")
+        batch = conf.collect_pages(page_id, doc_type="tech_review")
+        for p in batch:
+            console.print(f"  [dim]  └─ [{p.page_id}] {p.title}[/dim]")
+        pages.extend(batch)
     return chunk_confluence_pages(pages)
 
 
@@ -260,8 +285,38 @@ def _index_confluence_prd(settings: Settings):
     conf = _get_confluence_source(settings)
     pages = []
     for page_id in settings.confluence_prd_page_ids:
-        pages.extend(conf.collect_pages(page_id, doc_type="prd"))
+        console.print(f"  [dim]Root page: {page_id}[/dim]")
+        batch = conf.collect_pages(page_id, doc_type="prd")
+        for p in batch:
+            console.print(f"  [dim]  └─ [{p.page_id}] {p.title}[/dim]")
+        pages.extend(batch)
     return chunk_confluence_pages(pages)
+
+
+def _index_figma(settings: Settings):
+    from src.parsing.chunker import chunk_figma_nodes
+    from src.sources.figma_source import FigmaSource
+    figma = FigmaSource(access_token=settings.figma_access_token)
+    all_nodes = []
+    for file_key in settings.figma_file_id_list:
+        console.print(f"  [dim]File: {file_key}[/dim]")
+        nodes = figma.collect_nodes(file_key)
+        page_groups = {}
+        for n in nodes:
+            page_groups.setdefault(n.page_name or "(unknown)", []).append(n)
+        for pg_name, pg_nodes in page_groups.items():
+            type_counts = {}
+            for n in pg_nodes:
+                type_counts[n.node_type] = type_counts.get(n.node_type, 0) + 1
+            summary = ", ".join(f"{v} {k}" for k, v in sorted(type_counts.items()))
+            console.print(f"  [dim]  └─ {pg_name}: {len(pg_nodes)} nodes ({summary})[/dim]")
+        all_nodes.extend(nodes)
+
+        comments = figma.collect_comments(file_key)
+        if comments:
+            console.print(f"  [dim]  └─ Comments: {len(comments)}[/dim]")
+        all_nodes.extend(comments)
+    return chunk_figma_nodes(all_nodes)
 
 
 if __name__ == "__main__":

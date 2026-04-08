@@ -17,13 +17,14 @@
 │     java_parser / vue_parser / markdown_parser           │
 ├─────────────────────────────────────────────────────────┤
 │                 Sources Layer                            │
-│    local_source / github_source / confluence_source      │
+│  local_source / github_source / confluence_source        │
+│  figma_source                                            │
 └─────────────────────────────────────────────────────────┘
 ```
 
 ## 数据流
 
-1. **Sources** 从本地文件系统、GitHub API、Confluence API 获取原始内容
+1. **Sources** 从本地文件系统、GitHub API、Confluence API、Figma REST API 获取原始内容
 2. **Parsing** 使用 tree-sitter（Java/JS）解析代码为语义块（class/method 级别）
 3. **RAG** 将语义块向量化后存入 ChromaDB，每个块带有 `source_type` 元数据标签
 4. **Chains** 按模块配置，通过 LangChain 编排 LLM 调用链：

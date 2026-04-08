@@ -66,6 +66,7 @@ def write_index(settings: Settings, generated_modules: list[str]):
         "- 前端代码: `Pacvue/CustomDashboard-modules-web` (Vue)",
         "- 技术评审: Confluence (35+ 篇)",
         "- PRD 文档: Confluence (19 篇)",
+        "- 设计稿: Figma `Custom-Dashboard-Report`",
         "",
     ])
 

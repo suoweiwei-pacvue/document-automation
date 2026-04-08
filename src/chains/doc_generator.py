@@ -48,9 +48,16 @@ def generate_module_doc(
         doc_type_filter="tech_review",
     )
 
+    figma_docs = retriever.retrieve(
+        query=f"{module_def['title']} {' '.join(keywords[:3])}",
+        k=6,
+        source_types=["figma"],
+    )
+
     code_context = _format_docs(code_docs, max_chars=15000)
     prd_context = _format_docs(prd_docs, max_chars=8000)
     tech_context = _format_docs(tech_docs, max_chars=8000)
+    figma_context = _format_docs(figma_docs, max_chars=5000)
 
     skeleton_str = json.dumps(skeleton, ensure_ascii=False, indent=2, default=str)
     if len(skeleton_str) > 5000:
@@ -63,6 +70,7 @@ def generate_module_doc(
         code_context=code_context,
         prd_context=prd_context,
         tech_context=tech_context,
+        figma_context=figma_context,
     )
 
     llm = ChatOpenAI(

@@ -33,11 +33,36 @@ class ConfluenceSource:
         root_page_id: str,
         doc_type: str = "tech_review",
     ) -> list[ConfluencePage]:
-        """Fetch a page and all its descendants using CQL ancestor query."""
+        """Fetch a page and all its descendants.
+
+        Tries CQL ancestor query first; falls back to recursive
+        get_page_child_by_type if CQL is unavailable (e.g. 500 error).
+        """
         pages: list[ConfluencePage] = []
 
         self._fetch_and_append(root_page_id, doc_type, pages)
 
+        cql_ok = self._collect_via_cql(root_page_id, doc_type, pages)
+        if not cql_ok:
+            logger.info(
+                "CQL unavailable, falling back to recursive child-page traversal for %s",
+                root_page_id,
+            )
+            self._collect_children_recursive(root_page_id, doc_type, pages)
+
+        logger.info(
+            "Collected %d Confluence pages (type=%s) under page %s",
+            len(pages), doc_type, root_page_id,
+        )
+        return pages
+
+    def _collect_via_cql(
+        self,
+        root_page_id: str,
+        doc_type: str,
+        pages: list[ConfluencePage],
+    ) -> bool:
+        """Try to collect descendant pages via CQL. Returns False if CQL fails."""
         start = 0
         limit = 50
         while True:
@@ -50,7 +75,7 @@ class ConfluenceSource:
                 )
             except Exception as e:
                 logger.warning("CQL query failed for ancestor=%s: %s", root_page_id, e)
-                break
+                return False
 
             items = results.get("results", [])
             if not items:
@@ -67,11 +92,34 @@ class ConfluenceSource:
             if start >= total:
                 break
 
-        logger.info(
-            "Collected %d Confluence pages (type=%s) under page %s",
-            len(pages), doc_type, root_page_id,
-        )
-        return pages
+        return True
+
+    def _collect_children_recursive(
+        self,
+        page_id: str,
+        doc_type: str,
+        pages: list[ConfluencePage],
+        max_depth: int = 5,
+        depth: int = 0,
+    ):
+        """Fallback: recursively get child pages when CQL is unavailable."""
+        if depth >= max_depth:
+            return
+        try:
+            children = self.client.get_page_child_by_type(
+                page_id, type="page", start=0, limit=100,
+            )
+        except Exception as e:
+            logger.warning("Failed to get children of page %s: %s", page_id, e)
+            return
+
+        for child in children:
+            child_id = str(child.get("id", ""))
+            if child_id:
+                self._fetch_and_append(child_id, doc_type, pages)
+                self._collect_children_recursive(
+                    child_id, doc_type, pages, max_depth, depth + 1,
+                )
 
     def _fetch_and_append(
         self,
