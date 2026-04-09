@@ -1,7 +1,7 @@
 # 图表类型详解 功能逻辑文档
 
 > 本文档由 document-automation 工具自动生成，基于源代码、PRD 文档和技术评审文档。
-> 生成时间: 2026-04-07 16:11:32
+> 生成时间: 2026-04-09 10:09:48
 > 准确性评分: 未验证/100
 
 ---
@@ -12,62 +12,53 @@
 
 ## 1. 模块概述
 
-### 1.1 职责与定位
+### 1.1 模块职责与定位
 
-本模块是 Pacvue Custom Dashboard 系统的**图表类型核心层**，负责定义和管理所有支持的图表类型的 Setting 数据结构、数据查询逻辑和渲染处理流程。系统共支持 **8 种图表类型**：
+图表类型详解模块是 Pacvue Custom Dashboard 系统的核心渲染引擎层，负责定义、存储、解析和渲染八种图表类型的配置与数据。这八种图表类型分别为：
 
-| 图表类型 | 枚举值 | 说明 |
-|---------|--------|------|
-| TrendChart | `ChartType.LineChart` | 趋势折线图，支持三种模式 |
-| TopOverview | `ChartType.TopOverview` | 概览卡片，支持三种展示格式 |
-| ComparisonChart | `ChartType.ComparisonChart` | 对比图（原 BarChart 改名） |
-| StackedBarChart | `ChartType.StackedBarChart` | 堆叠柱状图 |
-| PieChart | `ChartType.PieChart` | 饼图 |
-| Table | `ChartType.Table` | 表格 |
-| GridTable | `ChartType.GridTable` | 二维交叉表格（25Q2 Sprint3 新增） |
-| WhiteBoard | `ChartType.WhiteBoard` | 白板（自由文本/图片） |
+| 图表类型 | 枚举值 | 主要用途 |
+|---|---|---|
+| TrendChart | `ChartType.LineChart` | 展示指标随时间变化的趋势折线/面积图 |
+| TopOverview | `ChartType.TopOverview` | 展示关键指标的汇总数值卡片（支持 Regular/TargetProgress/TargetCompare 三种格式） |
+| ComparisonChart | `ChartType.BarChart` | 对比不同物料/时间段的指标柱状图（支持 BySum/YOY/POP 模式） |
+| StackedBarChart | `ChartType.StackedBarChart` | 堆叠柱状图，按 breakDown 维度拆分指标 |
+| PieChart | `ChartType.PieChart` | 饼图/环形图，展示指标占比分布 |
+| Table | **待确认**（可能为 `ChartType.Table`） | 表格形式展示多指标数据 |
+| GridTable | **待确认**（可能为 `ChartType.GridTable`） | 二维交叉表格，行列均为物料维度 |
+| WhiteBoard | **待确认** | 白板/自由画布类型 |
 
-本模块的核心职责：
-1. **Setting 结构定义**：每种图表类型对应一个 `ChartSetting` 实现类，描述该图表的配置信息（指标、物料范围、模式等）
-2. **Setting 反序列化**：`ChartHandler` 根据请求参数将 JSON 反序列化为对应的 `ChartSetting` 子类
-3. **数据查询与处理**：通过 `@ChartTypeQualifier` 注解路由到对应的 `ChartDataHandler` 实现类，完成参数构建、下游服务调用和数据转换
-4. **图表摘要提取**：`ChartServiceImpl` 中根据各图表 Setting 提取 `ChartSummary`，用于生成图表提示文案（Chart Tips）
+本模块的核心职责包括：
+
+1. **Setting 数据结构定义**：每种图表类型对应一个 `ChartSetting` 实现类（如 `LineChartSetting`、`TopOverviewSetting`、`BarChartSetting` 等），封装该图表的全部配置信息。
+2. **序列化/反序列化**：Setting 以 JSON 形式随 chart 记录持久化存储，查询时由 `ChartHandler` 反序列化为对应的 Java 对象。
+3. **参数提取与路由**：通过 Visitor 模式和 `@ChartTypeQualifier` 注解，将不同图表类型的查询请求路由到对应的 `DataHandler`。
+4. **前端渲染初始化**：前端 `initChartData` 函数根据 `chartType` 解析 setting JSON，映射为 ECharts/HighCharts 所需的渲染数据结构。
+5. **设置弹窗交互**：前端 `dialog/lineChart.vue` 等组件提供图表配置的可视化编辑界面。
 
 ### 1.2 系统架构位置
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                    Frontend (Vue)                        │
-│  TrendChart / TopOverview / ComparisonChart / ...        │
-└──────────────────────┬──────────────────────────────────┘
-                       │ REST API (queryChart)
-┌──────────────────────▼──────────────────────────────────┐
-│              ChartHandler (Controller 层)                │
-│  - ThreadLocal 设置通用参数                               │
-│  - 反序列化 setting JSON → ChartSetting 子类              │
-└──────────────────────┬──────────────────────────────────┘
-                       │
-┌──────────────────────▼──────────────────────────────────┐
-│           ChartServiceImpl (Service 层)                  │
-│  - getLineChartSummaries / getBarChartSummaries 等       │
-│  - 图表摘要提取、Tips 生成                                │
-└──────────────────────┬──────────────────────────────────┘
-                       │ @ChartTypeQualifier 路由
-┌──────────────────────▼──────────────────────────────────┐
-│         ChartDataHandler 体系 (Strategy 层)              │
-│  AbstractChartDataHandler                                │
-│    ├── LineChartDataHandler (@ChartType.LineChart)       │
-│    ├── TopOverviewDataHandler (@ChartType.TopOverview)   │
-│    ├── ComparisonChartDataHandler                        │
-│    ├── StackedBarChartDataHandler                        │
-│    ├── PieChartDataHandler                               │
-│    ├── TableDataHandler                                  │
-│    ├── GridTableDataHandler                              │
-│    └── WhiteBoardDataHandler (待确认)                     │
-└──────────────────────┬──────────────────────────────────┘
-                       │ Feign 调用
-┌──────────────────────▼──────────────────────────────────┐
-│          Commerce 数据服务                                │
+│                    前端 Vue 组件层                         │
+│  dialog/lineChart.vue  │  TemplateManagements/index.js  │
+│  bulkChart.vue         │  viewSample.js                 │
+└──────────────────────────┬──────────────────────────────┘
+                           │ HTTP / Setting JSON
+                           ▼
+┌─────────────────────────────────────────────────────────┐
+│                  后端 Handler Chain                       │
+│  ChartHandler → SettingHandler → CollectorHandler        │
+└──────────────────────────┬──────────────────────────────┘
+                           │ ChartSetting 对象
+                           ▼
+┌─────────────────────────────────────────────────────────┐
+│              DataHandler 层（Strategy + Qualifier）       │
+│  LineChartDataHandler │ BarChartDataHandler │ ...        │
+└──────────────────────────┬──────────────────────────────┘
+                           │ ReportCustomDashboardQuery
+                           ▼
+┌─────────────────────────────────────────────────────────┐
+│                  Feign 下游服务                           │
 │  commerce1pApiFeign (Vendor/Hybrid)                      │
 │  commerce3pApiFeign (Seller)                             │
 └─────────────────────────────────────────────────────────┘
@@ -75,406 +66,447 @@
 
 ### 1.3 涉及的后端模块与前端组件
 
-**后端模块：**
-- `custom-dashboard-base`：包含所有 ChartSetting 定义类、枚举、DTO
-- `custom-dashboard-api`：包含 Controller、Service、ChartDataHandler 实现
+**后端 Maven 模块：**
+- `custom-dashboard-base` — 包含 DTO、Setting 类、枚举等基础定义
+- `custom-dashboard-api` — 包含 Service 层、DataHandler、Feign 客户端
 
 **后端核心包：**
-- `com.pacvue.base.dto`：ChartSetting、BasicInfo、Metric、MetricScope 等数据结构
+- `com.pacvue.base.dto` — ChartSetting 接口及其实现类、BasicInfo、Metric、MetricScope 等
 
-**前端目录：**
-- `dashboardSub`：各图表子组件
-- `components`：通用图表组件
-
-**前端组件：**
-- TrendChart（LineChart）
-- TopOverview
-- ComparisonChart
-- StackedBarChart
-- PieChart
-- Table
-- GridTable
-- WhiteBoard
-
-### 1.4 Maven 坐标与部署方式
-
-> **待确认**：具体 Maven groupId/artifactId 和部署方式需查阅项目 pom.xml。根据模块命名推测为 `com.pacvue:custom-dashboard-base` 和 `com.pacvue:custom-dashboard-api`。
+**前端核心组件：**
+- `dialog/lineChart.vue` — Trend Chart 设置弹窗
+- `TemplateManagements/index.js` — `initChartData` 函数
+- `TemplateManagements/index.vue` — 模板管理页面
+- `TemplateManagements/bulkCreateSteps/components/bulkChart.vue` — 批量创建中的图表解析
+- `TemplateManagements/lib` — `getStackedBar` 等辅助函数
+- `public/viewSample.js` — 各图表类型的 mock setting 数据
+- `public/filter.js` — `CounterList_All` 指标名称映射字典
 
 ---
 
 ## 2. 用户视角
 
-### 2.1 功能场景总览
+### 2.1 图表创建总体流程
 
-Custom Dashboard 允许用户创建自定义仪表盘，在仪表盘中添加各种类型的图表来可视化广告和零售数据。用户可以：
+用户在 Custom Dashboard 中创建图表时，需要经历以下步骤：
 
-1. **选择图表类型**：从 8 种图表类型中选择
-2. **配置图表设置**：选择指标（Metrics）、物料范围（Scope）、展示模式（Mode）等
-3. **查看图表数据**：系统根据 Setting 查询数据并渲染
-4. **交互操作**：如 TrendChart 的 D/W/M 快捷切换、Table 的自定义排序等
+1. **选择图表类型**：从 TrendChart、TopOverview、ComparisonChart、StackedBarChart、PieChart、Table、GridTable、WhiteBoard 中选择一种。
+2. **配置 Basic Setting**：设置图表名称、模式（Mode）、时间粒度（TimeSegment）、图表格式（ChartFormat）等基础参数。
+3. **选择指标（Select Metric）**：根据图表类型选择一个或多个指标（MetricType），每个指标可独立配置颜色、展示类型等。
+4. **配置物料范围（Scope Setting）**：为每个指标选择数据范围，包括 Platform、Profile、Campaign Tag 等层级。
+5. **高级配置**：如 Filter-linked Campaign、Quick Switch、BreakDown 等特殊选项。
+6. **保存**：Setting JSON 序列化存储到 chart 记录。
 
-### 2.2 各图表类型用户操作流程
+### 2.2 TrendChart（趋势图）
 
-#### 2.2.1 TrendChart（趋势图）
+**功能场景：** 展示一个或多个指标随时间变化的趋势，支持折线图和面积图。
 
-**三种模式：**
+**三种模式（Mode）：**
 
 | 模式 | 枚举值 | 说明 |
-|------|--------|------|
-| Single Metric | `SingleMetric` | 单指标，按物料维度拆分多条线 |
-| Multiple Metrics | `MultiMetrics` | 多指标，共享同一物料范围，每个指标一条线 |
-| Customize | `Customize` | 自定义组合，每条线独立配置指标和物料 |
+|---|---|---|
+| 多指标模式 | `MultiMetrics` | 所有指标共享同一物料范围，在同一图表上展示多条线 |
+| 多物料模式 | `MultiValues` | 单一指标，按不同物料分别展示多条线 |
+| 自定义模式 | `Customize` | 每条线可独立配置指标和物料范围 |
 
 **用户操作流程：**
-1. 选择模式（Single Metric / Multiple Metrics / Customize）
-2. 配置指标和物料范围
-3. 可选开启 "Show Quick Switch"（D/W/M 时间粒度快捷切换）
-4. 保存后，图表根据 `basic.timeSegment` 决定默认时间粒度
-5. 查看时可通过 D/W/M 按钮切换时间粒度
 
-**Filter-linked Campaign 支持：** 仅 Multiple Metrics 模式支持选择 Filter-linked Campaign 作为物料层级。
+1. 打开 `dialog/lineChart.vue` 设置弹窗，弹窗包含四个面板：**Basic Setting**、**Select Metric**、**Scope Setting**、**Bulk Setting**。
+2. 在 Basic Setting 中：
+   - 输入图表名称（name）
+   - 选择模式（MultiMetrics / MultiValues / Customize）
+   - 选择图表子类型（line / area，对应 `basic.type`）
+   - 选择时间粒度（Daily / Weekly / Monthly，对应 `basic.timeSegment`）
+   - 可选开启 Quick Switch（`basic.quickSwitchOn = true`），在展示时显示 D/W/M 快捷切换按钮
+3. 在 Select Metric 面板中，通过 `SelectMetric` 组件（`refSelectMetricRef`）选择指标，每个指标配置：
+   - `metricType`：指标类型
+   - `style`：JSON 字符串，含 `color` 属性
+   - `showType`：展示类型
+4. 在 Scope Setting 面板中，通过 `ScopeSetting` 组件配置物料范围：
+   - 选择 Platform（`groupLevel`，如 Amazon、Walmart 等）
+   - 选择物料层级和具体值（`scope: List<MetricScope>`）
+5. 保存后生成 Setting JSON。
 
-**Quick Switch（D/W/M）交互要点：**
-- 开启后 `quickSwitchOn=true`，前端根据 `basic.timeSegment` 决定默认显示值
-- 查询接口中不新增字段，入参 setting 中 `basic.timeSegment` 决定查询方式，回参中也包含相应的 `timeSegment`
-- **限制**：Commerce 数据源为 SnS 时，不允许勾选 Show Quick Switch（因为 SnS 数据源已默认 W/M）
+**Filter-linked Campaign 支持：** 根据 PRD，TrendChart 仅在 `MultiMetrics` 模式下支持 Filter-linked Campaign 物料。选中后右侧不展示具体 Data Scope 选择，而是展示提示文案。
 
-#### 2.2.2 TopOverview（概览卡片）
+**Quick Switch 功能：** 根据技术评审文档，开启后 `quickSwitchOn=true`，展示时根据 `basic.timeSegment` 由前端决定默认值。查询接口不新增字段，入参 setting 中 `basic.timeSegment` 决定查询方式。注意：Commerce 数据源为 SnS 时不允许勾选 Quick Switch。
 
-**三种展示格式（chartFormat）：**
+**Chart Tips 文案规则：**
+- Single Metric：`The {指标名称} for each {物料层级} individually`
+- Multiple Metric：`The combined data of {N} {物料层级}, including {物料A}, {物料B}, and {物料C}`
+- Customized：`Line 1: The {指标} for {物料层级} {物料枚举}`
 
-| 格式 | 说明 | 联动 FilterLinked 时间 | 联动 Customize 时间 | 对比期 | 可选将来时间 | 可选指标 |
-|------|------|----------------------|---------------------|--------|------------|---------|
-| Regular | 常规展示 | ✅ | ✅ | 可选 POP/YOY | ❌ | 全部 |
-| TargetProgress | 目标进度条 | ❌ | ✅ | 仅当期值 | ✅ | 数字+货币 |
-| TargetCompare | 目标对比 | ✅ | ✅ | 仅当期值 | ❌ | 百分比 |
+### 2.3 TopOverview（概览卡片）
 
-**TargetCompare 颜色规则：**
+**功能场景：** 以数值卡片形式展示关键指标的汇总值，支持三种展示格式。
 
-| 指标种类 | 具体指标 | 🟥 危险 | 🟧 警告 | 🟩 安全 | ⬜ 中性 |
-|---------|---------|---------|---------|---------|---------|
-| 正向 | 其他全部 | ≤80 | 80<X<100 | ≥100 | — |
-| 反向 | CPC/CPM/CPA/ACOS/Price/Position后缀 | ≥120 | 100<X<120 | ≤100 | — |
-| 中性 | Impressions/Spend/ASP/COGS | — | — | — | 全部 |
+**三种 ChartFormat（25Q4-S4 新增）：**
 
-**默认名称：** 创建时如果未指定名称，系统自动为前三个 section 设置默认名称：Performance、Efficiency、Awareness。
+| 格式 | 说明 | 时间联动 | 可选指标类型 | 可选未来时间 |
+|---|---|---|---|---|
+| Regular | 默认样式，保持原有逻辑 | 支持 FilterLinked + Customize | 全部 | 否 |
+| TargetProgress | 进度条样式，展示当前值/目标值的进度 | 仅 Customize | 数字+货币类型 | 是 |
+| TargetCompare | 目标对比样式，展示当前值与目标值的对比 | 支持 FilterLinked + Customize | 百分比类型 | 否 |
 
-**Filter-linked Campaign 支持：** 支持。
+**TargetProgress 操作流程：**
+1. 在 Basic Setting 中选择 `Chart Format = TargetProgress`
+2. 选择指标（仅数字+货币类型，排除百分比类型）
+3. 为每个选中的 Metric 输入 Target Value（必填，纯数字，最多两位小数，大于0）
+4. 系统自动计算百分比：
+   - 正向及中性指标：`Current / Target`
+   - 反向指标：`Target / Current`
+5. 每选中一个 Metric 展示一个进度条，最多3个 Metric
 
-#### 2.2.3 ComparisonChart（对比图）
+**TargetCompare 操作流程：**
+1. 选择 `Chart Format = TargetCompare`
+2. 选择指标（仅百分比类型）
+3. 输入 Target Value（与 Current Value 单位一致）
+4. 对比计算：`current / target * 100%`
+5. 颜色规则（根据技术评审文档）：
+   - 正向指标：≤80% 红色，80%<X<100% 橙色，≥100% 绿色
+   - 反向指标：≥120% 红色，100%<X<120% 橙色，≤100% 绿色
+   - 中性指标（Impressions、Spend、ASP、COGS）：全部灰色
 
-原名 BarChart，V1.2 版本改名为 Comparison Chart，允许用户将指标设置为柱子或折线。
+**默认名称设置：** 根据代码，`TopOverviewSetting.setChartName()` 方法会为前三个 metric 设置默认名称：`Performance`、`Efficiency`、`Awareness`。
 
-**支持的模式：**
-- By Sum：按汇总对比
-- YOY Multi xxx / YOY Multi Metrics / YOY Multi Period：同比对比
-- POP Multi xxx / POP Multi Metrics：环比对比
+**跨 Retailer 支持：** `TopOverviewSetting.isCrossRetailer()` 通过遍历所有 metrics 判断是否有任一 metric 跨 Retailer。
 
-**Filter-linked Campaign 支持：** 暂不支持。
+### 2.4 ComparisonChart（对比图）
 
-#### 2.2.4 StackedBarChart（堆叠柱状图）
+**功能场景：** 以柱状图形式对比不同物料或时间段的指标数据。
 
-**支持的模式：**
-- By Trend：按时间趋势堆叠
-- By Sum：按汇总堆叠
+**模式与 X 轴类型：**
 
-Metric 结构与 LineChart 完全一致（scope 是 `List<MetricScope>`，每个 MetricScope 含 scopeType + values）。
+| X 轴类型（xAsisType） | 说明 |
+|---|---|
+| BySum | 按汇总值对比，支持多指标 |
+| YOY | 同比对比（Year over Year） |
+| POP | 环比对比（Period over Period） |
 
-**Filter-linked Campaign 支持：** 暂不支持。
+**Mode 枚举：**
+- `MultiMetrics`：多指标模式
+- `MultiPeriods`：多时间段模式
+- `MultiValues`：多物料模式（**待确认**）
 
-#### 2.2.5 PieChart（饼图）
+**前端初始化逻辑（来自 `initChartData`）：**
+- 当 `XAxisType` 为 `POP` 或 `YOY` 时，会解析 `basic.typeStyle` 和 `basic.lastPeriodStyle` 中的颜色配置
+- `typeStyle` 默认颜色 `#ffdf6f`（YOY/POP 当期柱）
+- `lastPeriodStyle` 默认颜色 `#28c76f`（同期对比柱）
+- `scopeSetting` 数组包含三组数据：YOY/POP 柱、Same Period Last Year 柱、以及各指标柱
 
-**支持的模式：**
-- Customize：自定义选择物料
-- Top xxx：按指标排序取 Top N
+**Chart Tips 文案规则：**
+- BySum：`The {指标1}, {指标2}, and {指标3} for each {物料层级} individually`
+- YOY Multi Values：`The {指标} for each {物料层级} individually and their YOY comparison`
+- YOY Multi Metrics：`The combined data of {N} {物料层级} and their YOY comparison, including {物料枚举}`
+- YOY Multi Period：`The {指标} for the combined data of {N} {物料层级}, including {物料枚举}`
 
-**Filter-linked Campaign 支持：** 暂不支持。
+### 2.5 StackedBarChart（堆叠柱状图）
 
-#### 2.2.6 Table（表格）
+**功能场景：** 将单一指标按 breakDown 维度拆分为堆叠柱状图。
 
-**支持的模式：**
-- Customize：自定义选择物料
-- Top xxx：按指标排序取 Top N
+**两种展示模式：**
+- **By Trend**：按时间趋势展示堆叠柱状图
+- **By Sum**：按汇总值展示堆叠柱状图
 
-**特殊功能：**
-- V2.6 新增字段自定义排序
-- Setting 中含 `keywordFilter` 扩展（与 scope 平级，`List<Object>` 类型，兼容小平台 keyword 有 id/name 的情况）
+**breakDown 维度：** 在 Metric 中通过 `breakDown` 字段指定拆分维度（如 Placement、Campaign Type 等），由 `TemplateManagements/lib` 中的 `getStackedBar` 函数生成可选项。
 
-**Filter-linked Campaign 支持：** 暂不支持。
+**Chart Tips 文案：**
+- By Trend：`The daily trend of {指标} break down by {breakDown维度} for {N} {物料层级}, including {物料枚举}`
+- By Sum：`The sum of {指标} break down by {breakDown维度} for each {物料层级} individually`
 
-#### 2.2.7 GridTable（二维交叉表格）
+**限制：** StackedBarChart 不支持 Filter-linked Campaign，不支持 `showFilter`/`specifyFilterScope`/`filterScopes` 字段。
 
-**25Q2 Sprint3 新增**，解决用户查看二维交叉数据的需求（如各 Brand 在各 Retailer 下的 Sales）。
+### 2.6 PieChart（饼图）
 
-**创建步骤：**
-1. 选择指标（仅单选，支持 Cross Retailer 指标）
-2. 选择横向物料层级（Profile / Campaign Parent Tag / Campaign Tag / Campaign Type / Retailer / Share Tag）
-3. 根据横向物料层级选择纵向物料层级（有兼容性限制，见下表）
-4. 高级配置：Add Total Row、Add % of Total（仅纯数值指标支持，比率类指标如 ROAS/CPC/CVR 不支持）
+**功能场景：** 展示指标在不同物料间的占比分布。
+
+**两种格式（basic.format）：**
+- **Customize**：用户自选物料范围
+- **Top N**：按指标排序取前 N 个物料
+
+**前端初始化逻辑（来自 `initChartData`）：**
+```javascript
+{
+  typeChart: basic.format.toLowerCase(),  // "customize" 或 "top"
+  chartName: "",
+  XAxisType: basic.format,
+  metricType: metrics[0].metricType,      // 单指标
+  Material: basic.materialLevel           // 物料层级
+}
+```
+
+**Chart Tips 文案：**
+- Customize：`The proportion of the selected {物料层级}.`
+- Top N：`Top {N} ranked {物料层级} sort by {指标} in {Profile名称}`
+
+### 2.7 GridTable（二维交叉表格）
+
+**功能场景：** 提供二维交叉表格，行列均为物料维度，单元格展示指标交叉值。
+
+**创建步骤（来自 PRD）：**
+1. **选择指标**：与 Cross Retailer 指标一致，仅单选
+2. **选择横向物料层级**：Profile / Campaign Parent Tag / Campaign Tag / Campaign Type / Retailer / Share Tag
+3. **选择纵向物料层级**：根据横向物料的不同有限制（见下表）
+4. **高级配置**：Add Total Row、Add % of Total（仅纯数值指标支持）
 
 **横向/纵向物料兼容矩阵：**
 
 | 纵向 \ 横向 | Profile | Campaign (Parent) Tag | Campaign Type | Retailer | Share Tag |
-|-------------|---------|----------------------|---------------|----------|-----------|
-| Profile | ❌ | ✅ | ✅ | ❌ | ✅ |
-| Campaign (Parent) Tag | ✅ | ✅ | ✅ | ❌ | ✅ |
-| Campaign Type | ✅ | ✅ | ❌ | ❌ | ✅ |
-| Retailer | ❌ | ❌ | ❌ | ❌ | ✅ |
-| Share Tag | ✅ | ✅ | ✅ | ✅ | ❌ |
+|---|---|---|---|---|---|
+| Profile | ✗ | ✓ | ✓ | ✗ | ✓ |
+| Campaign (Parent) Tag | ✓ | ✓ | ✓ | ✗ | ✓ |
+| Campaign Type | ✓ | ✓ | ✗ | ✗ | ✓ |
+| Retailer | ✗ | ✗ | ✗ | ✗ | ✓ |
+| Share Tag | ✓ | ✓ | ✓ | ✓ | ✗ |
 
-**限制：**
-- 不支持 Filter 功能（`StackedBar / GridTable 不支持`）
-- 不支持批量选择 Chart 创建 Dashboard
-- 创建模板时只需选择横向/纵向物料层级，不需选择具体范围
+**限制：** GridTable 不支持 `showFilter`/`specifyFilterScope`/`filterScopes` 字段，不支持批量选择 Chart 创建 Dashboard。
 
-#### 2.2.8 WhiteBoard（白板）
+**Chart Tips：** `The {指标} at the intersection of each {横向物料层级} and {纵向物料层级}.`
 
-自由文本/图片展示，无数据查询逻辑。除 WhiteBoard 和 Stacked Bar Chart 以外的所有 Chart 在 V1.2 中都进行了 DSP 数据源改造。
+### 2.8 Table（表格）
 
-### 2.3 Chart Tips 文案规则
+**功能场景：** 以表格形式展示多指标数据，支持 Customize 和 Top N 两种模式。
 
-系统根据图表类型和模式自动生成提示文案，帮助用户理解图表含义：
+**Chart Tips 文案：**
+- Customize：`The proportion of the selected {物料层级}.`
+- Top N：`Top {N} ranked {物料层级} sort by {指标} in {Profile名称}`
 
-| 图表及类型 | Tips 模板 | 示例 |
-|-----------|----------|------|
-| Trend Chart - Single Metric | The {指标} for each {物料层级} individually | The Impression for each campaign tag individually |
-| Trend Chart - Multiple Metric | The {指标列表} for the combined data of N {物料层级}, including {物料枚举} | The ROAS, sales, and spend for the combined data of 3 profiles, including profile A, profile B, and profile C |
-| Trend Chart - Customized | Line N: The {指标} for the combined data of N {物料层级}, including {物料枚举} | Line 1: The Impression for the combined data of 3 profiles, including profile A, profile B, and profile C |
-| Comparison Chart - by sum | The {指标列表} for each {物料层级} individually | The ROAS, sales, and spend for each profile individually |
-| Stacked Bar Chart - by trend | The {指标} for N {物料层级}, including {物料枚举} | The spend for 3 profiles, including profile A, profile B, and profile C |
-| Stacked Bar Chart - by sum | The {指标} for each {物料层级} individually | The spend for each campaign tag individually |
-| Pie Chart - customize | The proportion of the selected {物料层级}. | The proportion of the selected profiles. |
-| Pie Chart - Top xxx | Top N ranked {物料} sort by {指标} in {范围} | Top 5 ranked ASINs sort by Impression in Profile AAA |
-| GridTable | The {指标} at the intersection of each {横向物料} and {纵向物料} | The Sales at the intersection of each retailer and brand |
+### 2.9 WhiteBoard（白板）
 
-> **SOV Group 特殊处理**：如果涉及 SOV Group，Brand 和 ASIN 按正常物料显示，最后补充 "within SOV Group AAA->Sub AAA, BBB->Sub BBB"，多选的 SOV Group 都列出。
+**待确认**：代码片段中未展示 WhiteBoard 的 Setting 实现类和渲染逻辑。根据模块骨架信息，WhiteBoard 是八种图表类型之一，但具体的 Setting 结构和渲染方式需要进一步确认。
+
+### 2.10 批量创建 Dashboard 的限制
+
+根据 PRD，以下情况不支持批量选择 Chart 创建 Dashboard：
+1. 选了 Cross Retailer 的图表
+2. 选了 Trend Chart Customized 模式的图表
+3. Overview 选了不同物料的图表
+4. 选了 Grid Table 的图表
+
+点击 "Go to Create" 后会弹窗提示具体原因。
 
 ---
 
 ## 3. 核心 API
 
-### 3.1 图表数据查询接口
+### 3.1 查询图表数据接口
 
-> **待确认**：具体 Controller 类名和路径需查阅代码。根据骨架信息推测如下：
+- **路径**: **待确认**（推测为 `POST /api/chart/query` 或类似路径）
+- **处理类**: `ChartServiceImpl`
+- **参数**:
+  - `setting`：JSON 对象，包含 `basic`（BasicInfo）和 `metrics`（List\<Metric\>）
+  - `chartType`：图表类型枚举值
+  - `timeSegment`：时间粒度（Daily/Weekly/Monthly），位于 `setting.basic.timeSegment`
+  - 其他通用参数：日期范围、用户上下文等
+- **返回值**: `List<CommerceDashboardReportView>` — 统一报表视图
+- **说明**: 根据 setting 中的 chartType 分发到对应 DataHandler 处理
 
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| POST | `/api/custom-dashboard/chart/query`（待确认） | 查询图表数据 |
+### 3.2 TrendChart 数据查询（LineChartDataHandler）
 
-**请求参数：**
+- **路由注解**: `@ChartTypeQualifier(ChartType.LineChart)`
+- **入口方法**: `handleData(CommerceReportRequest request)`
+- **内部调用**:
+  - `processCommonParams(request)` → 构建 `ReportCustomDashboardQuery`
+  - 根据 `query.getChannel()` 分发：
+    - `Vendor` / `Hybrid` → `commerce1pApiFeign.getTrendChatData(query)`
+    - `Seller` → `commerce3pApiFeign.getTrendChatData(query)`
+- **返回值**: `BaseResponse<List<ReportCustomDashboardTrendChartVO>>`，经过 `reportToCommerceView` 转换和 `displayOptimization` 优化后返回 `List<CommerceDashboardReportView>`
 
-```json
-{
-  "chartType": "LineChart",
-  "setting": {
-    "basic": {
-      "crossRetailer": false,
-      "mode": "MultiMetrics",
-      "timeSegment": "D",
-      "quickSwitchOn": true,
-      "chartFormat": "Regular",
-      "groupLevel": "Amazon"
-    },
-    "metrics": [
-      {
-        "groupLevel": "Amazon",
-        "scope": [
-          {
-            "scopeType": "Profile",
-            "values": ["profile-id-1", "profile-id-2"]
-          }
-        ],
-        "keywordFilter": [
-          { "id": "xxx", "name": "yyy" }
-        ],
-        "showFilter": true,
-        "specifyFilterScope": false,
-        "filterScopes": []
-      }
-    ]
-  },
-  "dateRange": { "startDate": "2024-01-01", "endDate": "2024-01-31" }
-}
-```
+### 3.3 Feign 下游接口
 
-**关键约定：**
-- 入参 setting 中 `basic.timeSegment` 决定查询的时间粒度（D/W/M）
-- 回参中也包含相应的 `basic.timeSegment`
-- `chartType` 决定 setting JSON 反序列化为哪个 ChartSetting 子类
+| Feign 客户端 | 方法 | 适用渠道 | 说明 |
+|---|---|---|---|
+| `commerce1pApiFeign` | `getTrendChatData(ReportCustomDashboardQuery)` | Vendor, Hybrid | 1P 渠道数据查询 |
+| `commerce3pApiFeign` | `getTrendChatData(ReportCustomDashboardQuery)` | Seller | 3P 渠道数据查询 |
 
-**返回值：**
+### 3.4 前端 API 调用
 
-对于 TrendChart，返回 `ReportCustomDashboardTrendChartVO` 列表，经转换后为 `CommerceDashboardReportView` 列表。
-
-> **待确认**：各图表类型的具体返回 VO 结构。
-
-### 3.2 前端调用方式
-
-前端根据图表类型组装 setting JSON，通过 POST 请求发送到后端查询接口。查询时：
-1. 前端将当前图表的完整 setting（含 basic、metrics、scope 等）序列化为 JSON
-2. 如果开启了 Quick Switch，前端修改 `basic.timeSegment` 后重新发起查询
-3. 后端返回数据后，前端根据图表类型选择对应的渲染组件
+前端通过 `initChartData` 函数（位于 `TemplateManagements/index.js`）解析后端返回的 setting 和数据，根据 `chartType` 分支处理。前端具体的 API 调用文件路径**待确认**。
 
 ---
 
 ## 4. 核心业务流程
 
-### 4.1 图表创建与保存流程
+### 4.1 Setting 保存流程
 
 ```mermaid
 flowchart TD
-    A[用户选择图表类型] --> B[配置图表设置]
-    B --> B1[选择模式 Mode]
-    B --> B2[选择指标 Metrics]
-    B --> B3[选择物料范围 Scope]
-    B --> B4[配置高级选项]
-    B1 --> C[前端生成 Setting JSON]
-    B2 --> C
-    B3 --> C
-    B4 --> C
-    C --> D[POST 保存至后端]
-    D --> E[后端持久化 Setting JSON]
-    E --> F[返回图表 ID]
+    A[用户打开设置弹窗<br/>dialog/lineChart.vue等] --> B[配置 Basic Setting<br/>name/mode/timeSegment/chartFormat]
+    B --> C[选择指标 Select Metric<br/>metricType/style/showType]
+    C --> D[配置物料范围 Scope Setting<br/>groupLevel/scope/filterScopes]
+    D --> E[可选: 高级配置<br/>quickSwitchOn/breakDown/showFilter]
+    E --> F[组装 Setting JSON]
+    F --> G{验证必填字段}
+    G -->|通过| H[调用保存接口<br/>Setting JSON 序列化存储到 chart 记录]
+    G -->|失败| I[提示用户补充必填信息]
+    H --> J[保存成功]
 ```
 
-### 4.2 图表数据查询主流程
+**详细步骤说明：**
+
+**步骤 1 — 打开设置弹窗：** 前端根据用户选择的图表类型，加载对应的设置弹窗组件。以 TrendChart 为例，加载 `dialog/lineChart.vue`，该弹窗包含四个面板：Basic Setting、Select Metric、Scope Setting、Bulk Setting。
+
+**步骤 2 — 配置 Basic Setting：** 用户填写图表名称（`basic.name`），选择模式（`basic.mode`，如 MultiMetrics/MultiValues/Customize），选择图表子类型（`basic.type`，如 line/area），选择时间粒度（`basic.timeSegment`，如 Daily/Weekly/Monthly）。对于 TopOverview，还需选择 `basic.chartFormat`（Regular/TargetProgress/TargetCompare）。
+
+**步骤 3 — 选择指标：** 通过 `SelectMetric` 组件选择指标。每个指标生成一个 Metric 对象，包含 `metricType`（指标类型）、`name`（指标名称）、`style`（JSON 字符串，含 color）、`showType`（展示类型）。对于 TargetProgress/TargetCompare 格式，还需输入 `targetValue`。
+
+**步骤 4 — 配置物料范围：** 通过 `ScopeSetting` 组件为每个指标配置物料范围。物料范围由 `scope: List<MetricScope>` 表示，每个 MetricScope 包含 `scopeType`（MetricScopeType 枚举）和 `values`（List\<String\>）。物料层级从粗到细排列，最后一个 MetricScope 代表最细粒度。
+
+**步骤 5 — 高级配置：** 包括：
+- `quickSwitchOn`：是否在展示时显示 D/W/M 快捷切换按钮（仅 TrendChart）
+- `breakDown`：堆叠柱状图的拆分维度（仅 StackedBarChart）
+- `showFilter`：View/Share 页面是否展示物料 Filter
+- `specifyFilterScope`：是否指定可选物料范围
+- `filterScopes`：指定范围时的物料 scope 配置
+- `keywordFilter`：关键词过滤（list\<Object\> 类型，兼容小平台 keyword 有 id/name 的情况）
+
+**步骤 6 — 组装 Setting JSON：** 前端将所有配置组装为 Setting JSON 对象，结构为 `{ basic: BasicInfo, metrics: List<Metric> }`。
+
+### 4.2 图表数据查询流程
 
 ```mermaid
 flowchart TD
-    A[前端发起查询请求] --> B[ChartHandler 接收请求]
-    B --> C[设置 ThreadLocal 通用参数]
-    C --> D[反序列化 setting JSON 为 ChartSetting 子类]
-    D --> E{根据 @ChartTypeQualifier 路由}
-    
-    E -->|LineChart| F1[LineChartDataHandler]
-    E -->|TopOverview| F2[TopOverviewDataHandler]
-    E -->|ComparisonChart| F3[ComparisonChartDataHandler]
-    E -->|StackedBarChart| F4[StackedBarChartDataHandler]
-    E -->|PieChart| F5[PieChartDataHandler]
-    E -->|Table| F6[TableDataHandler]
-    E -->|GridTable| F7[GridTableDataHandler]
-    E -->|WhiteBoard| F8[WhiteBoardDataHandler]
-    
-    F1 --> G[AbstractChartDataHandler.processCommonParams]
-    F2 --> G
-    F3 --> G
-    F4 --> G
-    F5 --> G
-    F6 --> G
-    F7 --> G
-    
-    G --> H[构建 ReportCustomDashboardQuery]
-    H --> I{判断 Channel}
-    
-    I -->|Vendor/Hybrid| J1[commerce1pApiFeign.getTrendChatData]
-    I -->|Seller| J2[commerce3pApiFeign.getTrendChatData]
-    
-    J1 --> K[获取原始数据]
-    J2 --> K
-    
-    K --> L[MetricMapping 过滤映射为 CommerceDashboardReportView]
-    L --> M[displayOptimization 优化]
-    M --> N[返回前端渲染]
+    A[前端发起查询请求<br/>携带 setting JSON + chartType] --> B[ChartHandler<br/>设置 ThreadLocal 通用参数<br/>反序列化 setting 为 ChartSetting 实现类]
+    B --> C[SettingHandler<br/>调用 extractParam 提取查询参数<br/>生成 List&lt;IndicatorParam&gt;]
+    C --> D[CollectorHandler<br/>收集并聚合参数]
+    D --> E{根据 @ChartTypeQualifier<br/>路由到对应 DataHandler}
+    E -->|LineChart| F[LineChartDataHandler.handleData]
+    E -->|BarChart| G[BarChartDataHandler.handleData]
+    E -->|TopOverview| H[TopOverviewDataHandler.handleData]
+    E -->|其他类型| I[对应 DataHandler.handleData]
+    F --> J[processCommonParams<br/>构建 ReportCustomDashboardQuery]
+    J --> K{判断 Channel}
+    K -->|Vendor/Hybrid| L[commerce1pApiFeign.getTrendChatData]
+    K -->|Seller| M[commerce3pApiFeign.getTrendChatData]
+    L --> N[返回 List&lt;ReportCustomDashboardTrendChartVO&gt;]
+    M --> N
+    N --> O[reportToCommerceView 转换]
+    O --> P[displayOptimization 优化]
+    P --> Q[返回 List&lt;CommerceDashboardReportView&gt;]
+    Q --> R[前端 initChartData 解析渲染]
 ```
 
-### 4.3 LineChartDataHandler 详细处理流程
+**详细步骤说明：**
 
-以 `LineChartDataHandler.handleData` 为例，这是代码中最完整的数据处理流程：
+**步骤 1 — ChartHandler 处理：** 这是 Handler Chain 的第一环。ChartHandler 负责：
+- 在 ThreadLocal 中设置通用参数（用户上下文、租户信息等）
+- 根据请求参数中的 `chartType`，将 setting JSON 反序列化为对应的 `ChartSetting` 实现类（如 `LineChartSetting`、`TopOverviewSetting`、`BarChartSetting` 等）
 
-```java
-@Slf4j
-@Component
-@ChartTypeQualifier(ChartType.LineChart)
-public class LineChartDataHandler extends AbstractChartDataHandler {
-    @Override
-    public List<CommerceDashboardReportView> handleData(CommerceReportRequest request) {
-        // 1. 构建通用查询参数
-        ReportCustomDashboardQuery query = processCommonParams(request);
-        
-        // 2. 根据 Channel 路由到不同的 Feign 客户端
-        switch (DashboardConfig.Channel.fromValue(query.getChannel())) {
-            case Vendor, Hybrid -> trendChatData = commerce1pApiFeign.getTrendChatData(query);
-            case Seller -> trendChatData = commerce3pApiFeign.getTrendChatData(query);
-        }
-        
-        // 3. 空数据检查
-        if (trendChatData == null || ObjectUtils.isEmpty(trendChatData.getData())) {
-            return Collections.emptyList();
-        }
-        
-        // 4. 指标类型过滤与映射
-        Set<MetricType> metricTypeList = MetricMapping.getMetricTypeList(request.getMetricTypeList());
-        List<CommerceDashboardReportView> result = data.stream()
-            .filter(Objects::nonNull)
-            .map(d -> reportToCommerceView(d, metricTypeList))
-            .collect(Collectors.toList());
-        
-        // 5. 展示优化
-        displayOptimization(result, request);
-        
-        return result;
+**步骤 2 — SettingHandler 处理：** 调用 `ChartSetting.extractParam(ApiContext)` 方法，根据 MetricScopeType 提取具体的查询参数：
+- 按 `MetricScopeType` 提取 profileId、物料 Id 等
+- 生成 `List<IndicatorParam>`，每个 IndicatorParam 对应一个指标的查询参数
+
+**步骤 3 — CollectorHandler 处理：** 收集并聚合来自 SettingHandler 的参数，准备传递给 DataHandler。
+
+**步骤 4 — DataHandler 路由：** 通过 `@ChartTypeQualifier` 注解实现路由。例如 `@ChartTypeQualifier(ChartType.LineChart)` 标注在 `LineChartDataHandler` 上，Spring 容器根据 chartType 注入对应的 DataHandler。
+
+**步骤 5 — LineChartDataHandler 处理（以 TrendChart 为例）：**
+1. 调用 `processCommonParams(request)` 构建 `ReportCustomDashboardQuery` 对象
+2. 记录日志：`Trend Chart channel:{}, Query Commerce params: {}`
+3. 根据 `DashboardConfig.Channel.fromValue(query.getChannel())` 判断渠道：
+   - `Vendor` 或 `Hybrid` → 调用 `commerce1pApiFeign.getTrendChatData(query)`
+   - `Seller` → 调用 `commerce3pApiFeign.getTrendChatData(query)`
+4. 检查返回数据是否为空，为空则返回 `Collections.emptyList()`
+5. 通过 `MetricMapping.getMetricTypeList(request.getMetricTypeList())` 获取指标类型集合
+6. 将 `ReportCustomDashboardTrendChartVO` 转换为 `CommerceDashboardReportView`
+7. 调用 `displayOptimization(result, request)` 进行展示优化
+
+### 4.3 前端渲染初始化流程
+
+```mermaid
+flowchart TD
+    A[接收后端返回数据 + setting] --> B{判断 chartType}
+    B -->|LineChart| C[解析 TrendChart 渲染数据]
+    B -->|PieChart| D[解析 PieChart 渲染数据]
+    B -->|BarChart| E[解析 ComparisonChart 渲染数据]
+    B -->|StackedBarChart| F[解析 StackedBarChart 渲染数据]
+    B -->|TopOverview| G[解析 TopOverview 渲染数据]
+    
+    C --> C1[提取 XAxisType = basic.type.toLowerCase]
+    C1 --> C2[提取 timeSegment = basic.timeSegment.toLowerCase]
+    C2 --> C3[构建 scopeSetting 数组<br/>每个 metric 映射为 color/name/targetType/showType]
+    C3 --> C4[返回 chartData 给 ECharts 渲染]
+    
+    E --> E1[提取 mode/periodType/XAxisType/timeSegment]
+    E1 --> E2{判断 XAxisType}
+    E2 -->|BySum| E3[直接映射 metrics 为 scopeSetting]
+    E2 -->|POP/YOY| E4[解析 typeStyle/lastPeriodStyle 颜色<br/>构建三组 scopeSetting]
+    E3 --> E5[返回 chartData]
+    E4 --> E5
+    
+    D --> D1[提取 typeChart = basic.format.toLowerCase]
+    D1 --> D2[提取 metricType = metrics第0个.metricType]
+    D2 --> D3[提取 Material = basic.materialLevel]
+    D3 --> D4[返回 chartData]
+```
+
+**LineChart 渲染数据结构：**
+```javascript
+{
+  chartName: "",
+  XAxisType: "line" | "area",           // 来自 basic.type
+  timeSegment: "daily" | "weekly" | "monthly",  // 来自 basic.timeSegment
+  scopeSetting: [
+    {
+      color: "#00Cfe8",                 // 来自 metric.style JSON 的 color
+      name: "Impressions",             // 来自 $t(metric.metricType)
+      targetType: "Impressions",       // metric.metricType
+      showType: "line"                 // metric.showType
     }
+    // ... 更多指标
+  ]
 }
 ```
 
-**处理步骤详解：**
+**BarChart（ComparisonChart）渲染数据结构：**
+```javascript
+{
+  chartName: "",
+  mode: "MultiMetrics" | "MultiPeriods" | "MultiValues",
+  periodType: "...",
+  XAxisType: "BySum" | "POP" | "YOY",
+  timeSegment: "daily" | "weekly" | "monthly",
+  chartType: "bar",
+  date: [],
+  scopeSetting: [...]  // 结构因 XAxisType 不同而异
+}
+```
 
-1. **processCommonParams**（模板方法，由 `AbstractChartDataHandler` 提供）：将 `CommerceReportRequest` 转换为 `ReportCustomDashboardQuery`，填充通用参数（时间范围、Channel、指标列表等）
-2. **Channel 路由**：根据 `DashboardConfig.Channel` 枚举值（Vendor/Hybrid/Seller）选择调用 1P 或 3P 的 Commerce Feign 接口
-3. **数据映射**：通过 `MetricMapping.getMetricTypeList` 获取需要的指标类型集合，然后将 `ReportCustomDashboardTrendChartVO` 转换为统一的 `CommerceDashboardReportView`
-4. **displayOptimization**（模板方法）：对结果进行展示优化处理
+当 `XAxisType` 为 `POP` 或 `YOY` 时，`scopeSetting` 包含：
+1. 第一组：YOY/POP 当期柱（颜色来自 `basic.typeStyle`，默认 `#ffdf6f`）
+2. 第二组：Same Period Last Year 柱（颜色来自 `basic.lastPeriodStyle`，默认 `#28c76f`）
+3. 后续组：各指标的详细数据
 
 ### 4.4 ChartSummary 提取流程
 
-`ChartServiceImpl` 中的 `getLineChartSummaries` 方法根据图表模式提取摘要信息，用于生成 Chart Tips：
+ChartSummary 用于生成图表的提示信息（Chart Tips），不同图表类型有不同的提取逻辑：
+
+**LineChart 的 ChartSummary 提取：**
 
 ```mermaid
 flowchart TD
-    A[getLineChartSummaries 入参 LineChartSetting] --> B{判断 Mode}
-    
-    B -->|MultiMetrics| C[取第一个 Metric 的信息]
-    C --> C1[获取 groupLevel]
-    C --> C2[获取 scopeList 最后一个元素的 scopeType]
-    C --> C3[获取 scopeList 最后一个元素的 values]
-    C1 --> D1[构建单个 ChartSummary]
-    C2 --> D1
-    C3 --> D1
-    D1 --> E[返回单元素列表]
-    
-    B -->|Customize| F[遍历每个 Metric]
-    F --> F1[每个 Metric 独立提取 groupLevel/scopeType/values]
-    F1 --> F2[构建 ChartSummary 列表]
-    F2 --> G[返回多元素列表]
-    
-    B -->|SingleMetric| H[返回空列表]
+    A[getLineChartSummaries<br/>LineChartSetting] --> B{判断 Mode}
+    B -->|MultiMetrics| C[取第一个 metric 的 groupLevel 和 scope]
+    C --> C1[取 scope 列表最后一个元素的 scopeType 和 values]
+    C1 --> C2[构建单个 ChartSummary<br/>productLine/scopeValues/scopeType/paramType]
+    B -->|Customize| D[遍历每个 metric]
+    D --> D1[每个 metric 独立提取 groupLevel 和 scope]
+    D1 --> D2[构建 ChartSummary 列表]
+    B -->|MultiValues| E[返回空列表]
 ```
 
-**关键逻辑：**
-- **MultiMetrics 模式**：所有 Metric 共享同一物料范围，因此只取第一个 Metric 的 scope 信息，生成一个 ChartSummary
-- **Customize 模式**：每个 Metric 独立配置，因此遍历所有 Metric，每个生成一个 ChartSummary
-- **SingleMetric 模式**：返回空列表（Tips 由其他方式生成）
-- **scopeType 取最后一个**：`scopeList.get(scopeList.size() - 1).getScopeType()`，说明 scope 是层级结构，最后一个是最细粒度
+- **MultiMetrics 模式**：所有 metric 共享同一物料范围，因此只取第一个 metric 的 `groupLevel` 和 `scope`（取 scope 列表最后一个元素，即最细粒度），构建单个 ChartSummary。
+- **Customize 模式**：每个 metric 独立配置，遍历所有 metric，为每个 metric 构建一个 ChartSummary。
+- **MultiValues 模式**：返回空列表（**待确认**具体原因）。
 
-### 4.5 BarChart（ComparisonChart/StackedBarChart）Summary 提取
+**BarChart 的 ChartSummary 提取：**
+- **MultiMetrics / MultiPeriods 模式**：与 LineChart 的 MultiMetrics 类似，取第一个 metric 的信息。特殊之处在于如果 metric 的 `groupLevel` 为 null，则回退到 `basic.getGroupLevel()`。
 
-BarChartSetting 的 `getLineChartSummaries`（方法名复用）逻辑类似但有差异：
+### 4.5 设计模式详解
 
-- **MultiMetrics 或 MultiPeriods 模式**：取第一个 Metric 的信息，如果 `groupLevel` 为 null 则回退到 `basic.groupLevel`
-- **其他模式**：返回空列表
+#### 4.5.1 Visitor 模式
 
-```java
-if (groupLevel == null) {
-    groupLevel = chartSetting.getBasic().getGroupLevel();
-}
-```
-
-这说明 BarChart 在某些模式下，Metric 级别的 groupLevel 可能为空，需要从 BasicInfo 中获取。
-
-### 4.6 关键设计模式详解
-
-#### 4.6.1 Visitor 模式
-
-`ChartSetting` 接口定义了 `accept(ChartVisitor<T>)` 方法，各实现类通过双重分派实现类型安全的图表处理：
+`ChartSetting` 接口定义了 `accept(ChartVisitor<T> visitor)` 方法，各实现类通过调用 `visitor.visit(this)` 实现类型分派：
 
 ```java
 // ChartSetting 接口
@@ -487,16 +519,25 @@ public interface ChartSetting {
 }
 
 // LineChartSetting 实现
+@Override
 public <T> T accept(ChartVisitor<T> visitor) {
     return visitor.visit(this);
 }
 ```
 
-`ChartVisitor<T>` 接口为每种 ChartSetting 子类定义一个 `visit` 方法，调用方无需 instanceof 判断即可处理不同图表类型。
+`ChartVisitor<T>` 是泛型接口，定义了对每种 ChartSetting 的 visit 方法。这样在需要根据图表类型执行不同逻辑时，无需使用 `instanceof` 判断，而是通过 Visitor 模式实现双重分派。
 
-#### 4.6.2 Strategy + Qualifier 注解注入
+#### 4.5.2 Strategy 模式
 
-通过自定义注解 `@ChartTypeQualifier` 实现按图表类型的 Bean 选择：
+各 `ChartSetting` 实现类封装了不同图表的配置与参数提取策略：
+- `LineChartSetting`：TrendChart 的配置，含 Mode 枚举（MultiMetrics/MultiValues/Customize）
+- `TopOverviewSetting`：TopOverview 的配置，含 ChartFormat（Regular/TargetProgress/TargetCompare）
+- `BarChartSetting`：ComparisonChart 的配置，含 xAsisType（BySum/YOY/POP）
+- 每个实现类的 `supportProductLines()` 方法有不同的实现策略
+
+#### 4.5.3 Qualifier/注解驱动路由
+
+`@ChartTypeQualifier` 注解将 DataHandler 与图表类型绑定：
 
 ```java
 @Component
@@ -504,16 +545,28 @@ public <T> T accept(ChartVisitor<T> visitor) {
 public class LineChartDataHandler extends AbstractChartDataHandler { ... }
 ```
 
-Spring 容器启动时，所有 `ChartDataHandler` 实现类通过 `@ChartTypeQualifier` 注册，运行时根据请求中的 `chartType` 选择对应的 Handler。
+Spring 容器在注入时根据 chartType 选择对应的 DataHandler 实例。
 
-#### 4.6.3 Template Method 模式
+#### 4.5.4 Template Method 模式
 
-`AbstractChartDataHandler` 提供通用模板方法：
-- `processCommonParams(CommerceReportRequest)`：构建通用查询参数
-- `displayOptimization(List<CommerceDashboardReportView>, CommerceReportRequest)`：展示优化
-- `reportToCommerceView(ReportCustomDashboardTrendChartVO, Set<MetricType>)`：数据转换
+`AbstractChartDataHandler` 提供公共逻辑（如 `processCommonParams`），子类实现 `handleData` 方法：
 
-子类（如 `LineChartDataHandler`）只需实现 `handleData` 方法，调用这些模板方法完成具体逻辑。
+```java
+public abstract class AbstractChartDataHandler {
+    protected ReportCustomDashboardQuery processCommonParams(CommerceReportRequest request) {
+        // 公共参数构建逻辑
+    }
+    
+    public abstract List<CommerceDashboardReportView> handleData(CommerceReportRequest request);
+}
+```
+
+#### 4.5.5 Handler Chain 模式
+
+请求处理链：`ChartHandler → SettingHandler → CollectorHandler`，每个 Handler 负责不同的处理阶段：
+- `ChartHandler`：设置 ThreadLocal、反序列化 setting
+- `SettingHandler`：提取查询参数
+- `CollectorHandler`：收集聚合参数并分发到 DataHandler
 
 ---
 
@@ -521,22 +574,400 @@ Spring 容器启动时，所有 `ChartDataHandler` 实现类通过 `@ChartTypeQu
 
 ### 5.1 数据库表
 
-> **待确认**：图表 setting 持久化表名，可能为 `custom_dashboard_chart` 或类似表。Setting JSON 作为一个字段存储在该表中。
+Setting 以 JSON 形式随 chart 记录序列化存储，具体表名**待确认**。推测存储在类似 `custom_dashboard_chart` 的表中，setting 字段为 TEXT/JSON 类型。
 
-### 5.2 核心类型体系
-
-#### 5.2.1 ChartSetting 接口
+### 5.2 ChartSetting 接口
 
 ```java
 public interface ChartSetting {
-    /** 是否跨 Retailer */
     boolean isCrossRetailer();
-    
-    /** 判断单个 metric 是否跨 Retailer（TopOverview 等需要） */
-    default boolean isCrossRetailer(Object metric) { ... }
-    
-    /** 访问者模式分派 */
-    <T> T accept(ChartVisitor
+    boolean isCrossRetailer(Object metric);  // TopOverview 特有
+    <T> T accept(ChartVisitor<T> visitor);
+    ChartType getChartType();
+    Set<Platform> supportProductLines();
+    void setChartName(String chartName);
+    // extractParam(ApiContext) — 待确认完整签名
+}
+```
+
+### 5.3 ChartType 枚举
+
+| 枚举值 | 对应图表 |
+|---|---|
+| `LineChart` | TrendChart |
+| `TopOverview` | TopOverview |
+| `BarChart` | ComparisonChart |
+| `StackedBarChart` | StackedBarChart |
+| `PieChart` | PieChart |
+| `Table` | Table（**待确认**） |
+| `GridTable` | GridTable（**待确认**） |
+
+### 5.4 BasicInfo 字段详解
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `name` | String | 图表名称 |
+| `mode` | Enum | 模式：MultiMetrics / MultiValues / Customize / MultiPeriods |
+| `timeSegment` | Enum | 时间粒度：Daily / Weekly / Monthly |
+| `type` | String | 图表子类型：line / area（TrendChart 用） |
+| `format` | String | PieChart 格式：Customize / Top |
+| `xAsisType` | String | X 轴类型：BySum / POP / YOY（BarChart 用） |
+| `periodType` | String | 时间段类型（BarChart 用） |
+| `materialLevel` | String | 物料层级（PieChart 用） |
+| `quickSwitchOn` | Boolean | 是否显示 D/W/M 快捷切换按钮（TrendChart 用） |
+| `typeStyle` | String | JSON 字符串，YOY/POP 当期柱样式，含 color |
+| `lastPeriodStyle` | String | JSON 字符串，同期对比柱样式，含 color |
+| `chartFormat` | Enum | 图表格式：Regular / TargetProgress / TargetCompare（TopOverview 用） |
+| `groupLevel` | Platform | 平台枚举（BarChart 用，当 metric 的 groupLevel 为 null 时回退） |
+
+### 5.5 Metric 字段详解
+
+| 字段 | 类型 | 说明 | 适用图表 |
+|---|---|---|---|
+| `metricType` | String | 指标类型标识 | 全部 |
+| `name` | String | 指标名称 | 全部 |
+| `fatherValue` | String | 父级值（用于层级指标） | 全部 |
+| `groupLevel` | Platform | 平台枚举 | 全部 |
+| `scope` | List\<MetricScope\> | 物料范围列表 | 全部 |
+| `style` | String | JSON 字符串，含 color 等样式配置 | 全部 |
+| `showType` | String | 展示类型（line/bar 等） | LineChart/BarChart |
+| `showFilter` | Boolean | View/Share 页面是否展示物料 Filter | Line/Bar/Pie/Table/TopOverview |
+| `specifyFilterScope` | Boolean | 是否指定可选物料范围 | 同上 |
+| `filterScopes` | List\<MaterialFilter\> | 指定范围时的物料 scope 配置 | 同上 |
+| `breakDown` | String/Object | 堆叠拆分维度 | StackedBarChart |
+| `keywordFilter` | List\<Object\> | 关键词过滤，兼容 {id, name} 格式 | 全部（2025Q4S3 新增） |
+| `retailers` | List\<Platform\> | Retailer 列表（跨 Retailer 时使用） | LineChart |
+
+### 5.6 MetricScope 结构
+
+```java
+@Data
+public class MetricScope {
+    private MetricScopeType scopeType;  // 枚举：Profile/CampaignTag/CampaignType/Retailer 等
+    private List<String> values;         // 具体值列表
+}
+```
+
+### 5.7 MaterialFilter 结构
+
+```java
+@Data
+public class MaterialFilter {
+    private MetricScopeType type;   // 物料类型
+    private List<String> values;     // 物料值列表
+}
+```
+
+常用 type 值（Commerce 场景）：`CommerceAsin`、`CommerceBrand`、`CommerceCategory`、`CommerceAmazonBrand`、`CommerceAmazonCategory`、`CommerceStore`。
+
+### 5.8 ChartSummary 结构
+
+```java
+@Data
+public class ChartSummary {
+    private String productLine;        // 平台名称
+    private List<String> scopeValues;  // 物料值列表
+    private MetricScopeType scopeType; // 物料类型
+    private ChartTips.ParamType paramType; // 参数类型（由 MetricScopeType 映射）
+}
+```
+
+### 5.9 各图表类型 Setting JSON 示例
+
+#### LineChartSetting（TrendChart）
+
+```json
+{
+  "basic": {
+    "name": "Sales Trend",
+    "mode": "MultiMetrics",
+    "type": "line",
+    "timeSegment": "Daily",
+    "quickSwitchOn": true
+  },
+  "metrics": [
+    {
+      "metricType": "Sales",
+      "name": "Sales",
+      "groupLevel": "Amazon",
+      "scope": [
+        { "scopeType": "Profile", "values": ["profile-001", "profile-002"] }
+      ],
+      "style": "{\"color\":\"#00Cfe8\"}",
+      "showType": "line",
+      "showFilter": true,
+      "specifyFilterScope": false,
+      "filterScopes": [],
+      "keywordFilter": []
+    },
+    {
+      "metricType": "Spend",
+      "name": "Spend",
+      "groupLevel": "Amazon",
+      "scope": [
+        { "scopeType": "Profile", "values": ["profile-001", "profile-002"] }
+      ],
+      "style": "{\"color\":\"#ff6384\"}",
+      "showType": "line"
+    }
+  ]
+}
+```
+
+#### TopOverviewSetting
+
+```json
+{
+  "basic": {
+    "name": "Performance Overview",
+    "chartFormat": "TargetProgress"
+  },
+  "metrics": [
+    {
+      "metricType": "Sales",
+      "name": "Performance",
+      "groupLevel": "Amazon",
+      "scope": { "scopeType": "Profile", "values": ["profile-001"] },
+      "targetValue": 10000
+    },
+    {
+      "metricType": "ROAS",
+      "name": "Efficiency",
+      "groupLevel": "Amazon",
+      "scope": { "scopeType": "Profile", "values": ["profile-001"] }
+    }
+  ]
+}
+```
+
+注意：TopOverview 的 scope 结构与 LineChart 不同——从代码片段 `ChartSummary` 部分可以看到 `chartSetting.getMetrics().get(0).getScope()` 直接返回单个对象（`scope.getScopeType()`），而非列表。这表明 TopOverview 的 Metric.scope 可能是单个 MetricScope 对象而非 List。
+
+#### BarChartSetting（ComparisonChart）
+
+根据技术评审文档，BarChart 的 Metric 结构与 LineChart 完全一致（scope 是 `List<MetricScope>`）：
+
+```json
+{
+  "basic": {
+    "name": "Sales Comparison",
+    "mode": "MultiMetrics",
+    "xAsisType": "YOY",
+    "timeSegment": "Monthly",
+    "typeStyle": "{\"color\":\"#ffdf6f\"}",
+    "lastPeriodStyle": "{\"color\":\"#28c76f\"}"
+  },
+  "metrics": [
+    {
+      "metricType": "Sales",
+      "name": "Sales",
+      "groupLevel": "Amazon",
+      "scope": [
+        { "scopeType": "Profile", "values": ["profile-001"] }
+      ],
+      "style": "{\"color\":\"#00Cfe8\"}",
+      "showType": "bar"
+    }
+  ]
+}
+```
+
+### 5.10 各 ChartSetting 实现类的 supportProductLines 差异
+
+| 实现类 | supportProductLines 逻辑 |
+|---|---|
+| `LineChartSetting` | 如果第一个 metric 的 groupLevel 为 `Platform.Retailer`，则从所有 metric 的 `retailers` 列表中收集；否则从所有 metric 的 `groupLevel` 中收集 |
+| `TopOverviewSetting` | 从所有 metric 的 `groupLevel` 中收集 |
+| `BarChartSetting` | 如果 `isCrossRetailer()` 为 true，从所有 metric 的 `groupLevel` 中收集；否则返回 `basic.getGroupLevel()` 的单元素集合 |
+
+### 5.11 各 ChartSetting 实现类的 isCrossRetailer 差异
+
+| 实现类 | isCrossRetailer 逻辑 |
+|---|---|
+| `LineChartSetting` | 委托给 `basic.isCrossRetailer()` |
+| `TopOverviewSetting` | 遍历所有 metrics，任一 metric 的 `isCrossRetailer()` 为 true 则返回 true |
+| `BarChartSetting` | 委托给 `basic.isCrossRetailer()` |
+
+---
+
+## 6. 平台差异
+
+### 6.1 渠道分发逻辑
+
+`LineChartDataHandler` 根据 `DashboardConfig.Channel` 枚举进行渠道分发：
+
+| Channel | Feign 客户端 | 说明 |
+|---|---|---|
+| `Vendor` | `commerce1pApiFeign` | Amazon Vendor Central（1P） |
+| `Hybrid` | `commerce1pApiFeign` | 混合模式，走 1P 接口 |
+| `Seller` | `commerce3pApiFeign` | Amazon Seller Central（3P） |
+
+### 6.2 Platform 枚举与 groupLevel
+
+`groupLevel` 字段使用 `Platform` 枚举，代表不同的广告/零售平台。已知值包括：
+- `Amazon` — Amazon 广告
+- `Retailer` — 跨 Retailer 模式（特殊处理，LineChartSetting 中会从 `retailers` 列表提取具体平台）
+- 其他平台值**待确认**
+
+### 6.3 Commerce 数据源限制
+
+根据技术评审文档：
+- Commerce 数据源为 SnS（Subscribe & Save）时，不允许勾选 Quick Switch（D/W/M 快捷切换），因为此类数据源已默认了 W/M 粒度。
+
+### 6.4 指标类型与图表格式的平台差异
+
+TopOverview 的 TargetProgress 和 TargetCompare 格式对指标类型有限制：
+- **TargetProgress**：仅支持数字+货币类型指标（排除百分比类型和 customMetric）
+- **TargetCompare**：仅支持百分比类型指标
+
+反向指标列表（影响颜色显示规则）：
+- 广告：CPC、CPM、CPA、ACOS
+- Retail：Price
+- SOV：带有 Position 后缀的指标
+
+中性指标列表：
+- 广告：Impressions、Spend、ASP
+- Retail：COGS
+
+### 6.5 Filter 粒度差异
+
+根据技术评审文档（2026Q1S6），各图表类型的 filter 粒度不同：
+
+| 图表类型 | Filter 粒度 | 说明 |
+|---|---|---|
+| TopOverview | per section | 同 sectionNo 的多个 metric 共享一个 filter 配置 |
+| LineChart | per metric | 每个 metric 独立 filter |
+| BarChart | per metric | 每个 metric 独立 filter |
+| PieChart | per metric | 每个 metric 独立 filter |
+| Table | per metric | 通常只有一个 metric |
+| StackedBar | 不支持 | — |
+| GridTable | 不支持 | — |
+
+---
+
+## 7. 配置与依赖
+
+### 7.1 Feign 下游服务依赖
+
+| Feign 客户端 | 接口方法 | 说明 |
+|---|---|---|
+| `commerce1pApiFeign` | `getTrendChatData(ReportCustomDashboardQuery)` | Vendor/Hybrid 渠道的 TrendChart 数据查询 |
+| `commerce3pApiFeign` | `getTrendChatData(ReportCustomDashboardQuery)` | Seller 渠道的 TrendChart 数据查询 |
+
+### 7.2 关键配置项
+
+- `DashboardConfig.Channel` — 渠道配置枚举，包含 Vendor、Seller、Hybrid
+- 其他 Apollo/application.yml 配置项**待确认**
+
+### 7.3 缓存策略
+
+**待确认**：代码片段中未展示 Redis 缓存相关逻辑。
+
+### 7.4 消息队列
+
+**待确认**：代码片段中未展示 Kafka 相关逻辑。
+
+### 7.5 前端依赖
+
+- `CounterList_All`（来自 `public/filter.js`）：指标名称映射字典，用于将 metricType 转换为可读名称
+- `Commerce1p3p` 组件：Commerce 渠道选择组件，在 `lineChart.vue` 中引用
+- `Title` 组件：设置面板标题组件
+- `SelectMetric` 组件（`refSelectMetricRef`）：指标选择器
+- `ScopeSetting` 组件（`refScopeSetting` / `refBySumscopeSetting`）：物料范围设置器
+
+---
+
+## 8. 版本演进
+
+### 8.1 V2.0 — TrendChart 新增 Mode
+
+**来源：** Custom Dashboard V2.0 技术评审
+
+- TrendChart 支持三种模式：Single Metric（后改名 MultiValues）、Multiple Metric（MultiMetrics）、Custom（Customize）
+- 原型链接：`https://app.mockplus.cn/run/prototype/hw3uWkRGGgxWz/...`
+
+### 8.2 V2.5 — Chart Tips 文案整理
+
+**来源：** Custom Dashboard V2.5 PRD
+
+- 为所有图表类型定义了标准化的 Tips 文案模板
+- 涵盖 TrendChart（三种模式）、ComparisonChart（BySum/YOY/POP × 三种子模式）、StackedBarChart（ByTrend/BySum）、PieChart（Customize/Top）、Table（Customize/Top）
+- SOV Group 场景的特殊文案处理
+
+### 8.3 V2.8 — Filter-linked Campaign
+
+**来源：** Custom Dashboard V2.8 PRD
+
+- 新增 Filter-linked Campaign 物料类型
+- 每个 Retailer 下存在一个，不存在于 Cross Retailer
+- 支持情况：TopOverview（支持）、TrendChart（仅 MultiMetrics）、其他图表暂不支持
+- Bind to Filter 支持的字段列表与 Profile 一致
+
+### 8.4 2025Q4-S3 — keywordFilter 字段新增
+
+**来源：** Custom Dashboard 2025Q4S3 技术评审
+
+- 在 Metric 中新增 `keywordFilter` 字段，`List<Object>` 类型
+- 兼容小平台 keyword 有 id/name 的情况：`[{"id": "xxx", "name": "yyy"}]`
+- 跟 scope 平级添加
+
+### 8.5 2025Q4-S4 — TopOverview 新增进度条展示样式 + Quick Switch
+
+**来源：** Custom Dashboard 2025Q4S4 技术评审
+
+**TopOverview ChartFormat：**
+- 新增 `chartFormat` 字段：Regular / TargetProgress / TargetCompare
+- 默认 Regular，保持原有逻辑
+- TargetProgress：只有当期值，先选指标再输入目标值，百分比自动计算
+- TargetCompare：对比计算 `current/target*100%`，颜色根据正向/反向/中性指标规则显示
+
+**Quick Switch（D/W/M）：**
+- 范围：(retailer + commerce) + trend
+- `quickSwitchOn=true` 时保存，展示时显示 D/W/M 快捷按钮
+- queryChart 接口不新增字段，`basic.timeSegment` 决定查询方式
+- Commerce SnS 数据源不允许勾选
+
+### 8.6 2026Q1-S6 — showFilter/specifyFilterScope/filterScopes 字段新增
+
+**来源：** Custom Dashboard 2026Q1S6 技术评审
+
+- 在 5 个 ChartSetting 实现类的 Metric 中新增 3 个字段
+- `showFilter`（Boolean）：View/Share 页面是否展示物料 Filter
+- `specifyFilterScope`（Boolean）：是否指定可选物料范围
+- `filterScopes`（List\<MaterialFilter\>）：指定范围时的物料 scope 配置
+- StackedBar / GridTable 不支持
+- 存储随 chart.setting JSON 序列化，无 DDL 变更
+
+### 8.7 25Q2-S3 — GridTable 新图表类型
+
+**来源：** Custom Dashboard 25Q2 Sprint3 PRD
+
+- 全新的二维 Table 图表类型
+- 单指标，行列均为物料维度，取交集确定数据范围
+- 支持 Add Total Row 和 Add % of Total
+- 暂不支持批量选择 Chart 创建 Dashboard
+
+### 8.8 26Q1-S4 — Chart Type Collection Survey
+
+**来源：** Custom DB 26Q1-S4 PRD
+
+- Custom Dashboard 页面右下角新增悬浮图标，收集用户对新图表类型的需求
+- 可选图表类型：Scatter Plot、Radar、Gauge、Rising Sun、Decomposition Tree、Metric Relationship、Stacked Area、Funnel
+- 提交后记录用户反馈数据
+
+---
+
+## 9. 已知问题与边界情况
+
+### 9.1 数据为空处理
+
+`LineChartDataHandler.handleData` 中明确处理了数据为空的情况：
+```java
+if (trendChatData == null || ObjectUtils.isEmpty(trendChatData.getData())) {
+    return Collections.emptyList();
+}
+```
+
+### 9.2 前端默认
 
 ---
 

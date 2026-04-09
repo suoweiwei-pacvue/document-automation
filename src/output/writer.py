@@ -6,7 +6,7 @@ from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader
 
-from src.config import MODULE_DEFINITIONS, Settings
+from src.config import MODULE_DEFINITIONS, USER_DOC_DEFINITIONS, Settings
 
 logger = logging.getLogger(__name__)
 
@@ -73,3 +73,56 @@ def write_index(settings: Settings, generated_modules: list[str]):
     index_path = output_path / "README.md"
     index_path.write_text("\n".join(lines), encoding="utf-8")
     logger.info("Wrote index to %s", index_path)
+
+
+def write_user_doc(
+    user_doc_key: str,
+    content: str,
+    settings: Settings,
+):
+    """Write a user-facing document to output/user-guide/."""
+    user_def = USER_DOC_DEFINITIONS[user_doc_key]
+    guide_dir = settings.output_path / "user-guide"
+    guide_dir.mkdir(parents=True, exist_ok=True)
+
+    env = Environment(loader=FileSystemLoader(str(TEMPLATE_DIR)))
+    template = env.get_template("user_doc.md.j2")
+
+    rendered = template.render(
+        chapter_title=user_def["title"],
+        content=content,
+        generated_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    )
+
+    filename = f"{user_def['id']}.md"
+    filepath = guide_dir / filename
+    filepath.write_text(rendered, encoding="utf-8")
+    logger.info("Wrote user guide to %s", filepath)
+    return filepath
+
+
+def write_user_guide_index(settings: Settings, generated_chapters: list[str]):
+    """Write an index file for user-guide documents."""
+    guide_dir = settings.output_path / "user-guide"
+    guide_dir.mkdir(parents=True, exist_ok=True)
+
+    lines = [
+        "# Custom Dashboard 用户指南",
+        "",
+        "> Pacvue Custom Dashboard 产品使用指南",
+        f"> 更新时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+        "",
+        "## 目录",
+        "",
+    ]
+
+    for key in generated_chapters:
+        if key in USER_DOC_DEFINITIONS:
+            ch = USER_DOC_DEFINITIONS[key]
+            lines.append(f"- [{ch['title']}]({ch['id']}.md) - {ch['description']}")
+
+    lines.append("")
+
+    index_path = guide_dir / "README.md"
+    index_path.write_text("\n".join(lines), encoding="utf-8")
+    logger.info("Wrote user guide index to %s", index_path)

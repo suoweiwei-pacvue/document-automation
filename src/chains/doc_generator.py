@@ -29,8 +29,11 @@ def generate_module_doc(
     backend_modules = module_def.get("backend_modules", [])
 
     code_docs = retriever.retrieve(
+        # 取前五个关键词
         query=" ".join(keywords[:5]),
+        # 取相似度最高的15条代码片段
         k=15,
+        # 只从backend和frontend模块中获取代码片段
         source_types=["backend", "frontend"],
     )
 

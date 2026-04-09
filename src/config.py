@@ -350,3 +350,49 @@ MODULE_DEFINITIONS = {
         ],
     },
 }
+
+
+USER_DOC_DEFINITIONS = {
+    "overview": {
+        "id": "00-overview",
+        "title": "Custom Dashboard 产品概览",
+        "description": "产品简介、核心功能一览、适用角色",
+        "source_modules": ["architecture"],
+    },
+    "dashboard-management": {
+        "id": "01-dashboard-management",
+        "title": "Dashboard 管理",
+        "description": "创建/编辑/删除 Dashboard，Chart 管理，模板引用",
+        "source_modules": ["core-api", "template", "share-link"],
+    },
+    "chart-settings": {
+        "id": "02-chart-settings",
+        "title": "图表配置与过滤条件",
+        "description": "各类图表的创建与配置，物料过滤条件设置及其对绩效数据的影响",
+        "source_modules": ["chart-types", "dashboard-setting-filter", "data-source"],
+    },
+    "platform-guide": {
+        "id": "03-platform-guide",
+        "title": "各广告平台使用指南",
+        "description": "Amazon、Walmart、Commerce/Retail、DSP 等平台的数据查看方式与差异说明",
+        "source_modules": [
+            "platform-amazon", "platform-walmart", "platform-commerce",
+            "platform-dsp", "platform-instacart", "platform-criteo",
+            "platform-target", "platform-kroger", "platform-chewy",
+            "platform-citrus", "platform-bol", "platform-doordash",
+            "platform-samsclub",
+        ],
+    },
+    "sharing": {
+        "id": "04-sharing",
+        "title": "分享与协作",
+        "description": "ShareLink 外部分享、模板跨 Client 共享",
+        "source_modules": ["share-link", "template"],
+    },
+    "faq": {
+        "id": "05-faq",
+        "title": "常见问题",
+        "description": "使用过程中的常见问题与解答",
+        "source_modules": ["core-api", "chart-types", "data-source", "infra"],
+    },
+}

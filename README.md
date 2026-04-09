@@ -101,16 +101,42 @@ python -m src.main index --source figma
 
 ### 典型工作流
 
-1. **首次使用**：`index`（全量）-> `generate`（全量）
-2. **后端代码变更**：`index --source backend` -> `generate --module <模块名>`
-3. **PRD 文档更新**：`index --source confluence-prd` -> `generate`
-4. **全量重建**：`index --clear` -> `generate`
+1. **首次使用**：`index`（全量）-> `generate`（全量）-> `generate-user-guide`（用户指南）
+2. **后端代码变更**：`index --source backend` -> `generate --module <模块名>` -> `generate-user-guide --module <章节名>`
+3. **PRD 文档更新**：`index --source confluence-prd` -> `generate` -> `generate-user-guide`
+4. **全量重建**：`index --clear` -> `generate` -> `generate-user-guide`
+
+## 用户指南生成
+
+除技术文档外，还可以基于已生成的技术文档，自动转写为面向终端用户（广告主/运营人员）的操作指南：
+
+```bash
+# 生成全部用户指南（需先运行 generate 生成技术文档）
+python -m src.main generate-user-guide
+
+# 生成指定章节
+python -m src.main generate-user-guide --module chart-settings
+
+# 查看所有用户指南章节
+python -m src.main list-user-chapters
+```
+
+用户指南输出到 `output/user-guide/` 目录，包含以下章节：
+
+- `00-overview.md` - Custom Dashboard 产品概览
+- `01-dashboard-management.md` - Dashboard 管理
+- `02-chart-settings.md` - 图表配置与过滤条件
+- `03-platform-guide.md` - 各广告平台使用指南
+- `04-sharing.md` - 分享与协作
+- `05-faq.md` - 常见问题
 
 ## 输出说明
 
 向量数据库（ChromaDB）仅在本地运行，用于中间检索，不包含在最终产物中。**最终产物为 `output/` 目录下的 Markdown 文档**，可直接提交到 Git 或导入到任何知识库平台。
 
-生成的文档按业务模块划分：
+### 技术文档
+
+生成的技术文档按业务模块划分：
 
 - `00-architecture.md` - 全局架构总览
 - `01-core-api.md` - Dashboard CRUD / Chart / QueryChart 核心链路
@@ -136,6 +162,17 @@ python -m src.main index --source figma
 - `21-message.md` - 消息通知
 - `22-infra.md` - 基础设施
 - `23-frontend.md` - 前端架构
+
+### 用户指南
+
+面向终端用户的操作指南，输出到 `output/user-guide/`：
+
+- `00-overview.md` - 产品概览
+- `01-dashboard-management.md` - Dashboard 管理
+- `02-chart-settings.md` - 图表配置与过滤条件
+- `03-platform-guide.md` - 各广告平台使用指南
+- `04-sharing.md` - 分享与协作
+- `05-faq.md` - 常见问题
 
 ## 架构
 

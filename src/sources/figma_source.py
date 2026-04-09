@@ -102,8 +102,8 @@ class FigmaSource:
             if not message:
                 continue
 
-            user = comment.get("user", {}).get("handle", "unknown")
-            node_id = comment.get("client_meta", {}).get("node_id", "")
+            user = (comment.get("user") or {}).get("handle", "unknown")
+            node_id = (comment.get("client_meta") or {}).get("node_id", "")
             resolved = comment.get("resolved_at") is not None
 
             content_parts = [

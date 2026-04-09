@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class VueChunk:
+    """ Vue结构体对象 """
     chunk_type: str  # "component", "script", "template", "style", "method", "computed", "store_action"
     name: str
     content: str

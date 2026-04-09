@@ -22,16 +22,18 @@ class GatewayEmbeddings(Embeddings):
     def embed_documents(self, texts: list[str]) -> list[list[float]]:
         import litellm
         results = []
-        batch_size = 20
+        batch_size = 20  # 批量大小设置为20，提高请求效率
         for i in range(0, len(texts), batch_size):
-            batch = texts[i : i + batch_size]
+            batch = texts[i: i + batch_size]
+            # LLM接口通常有单条文本长度限制，这里做截断
             batch = [t[:8000] if len(t) > 8000 else t for t in batch]
             response = litellm.embedding(
-                model=self.model,
-                input=batch,
-                api_key=self.api_key,
-                api_base=self.api_base,
+                model=self.model,        # 使用实例指定的embedding模型
+                input=batch,             # 当前批次文本
+                api_key=self.api_key,    # LLM网关的api key
+                api_base=self.api_base,  # 可选网关base
             )
+            # response.data是一个包含每个文本embedding的列表
             for item in response.data:
                 results.append(item["embedding"])
         return results

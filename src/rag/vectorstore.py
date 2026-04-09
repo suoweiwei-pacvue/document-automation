@@ -38,6 +38,7 @@ class VectorStoreManager:
         total = 0
         for i in range(0, len(documents), batch_size):
             batch = documents[i : i + batch_size]
+            # 入向量库并打印日志
             self.store.add_documents(batch)
             total += len(batch)
             logger.info("Indexed %d / %d documents", total, len(documents))

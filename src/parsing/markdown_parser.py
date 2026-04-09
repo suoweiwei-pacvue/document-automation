@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 logger = logging.getLogger(__name__)
 
 
+""" 定义confluence的解析器，可改进，目前仅能解析html,对于其中的富文本格式解析不足 """
 @dataclass
 class DocChunk:
     chunk_type: str  # "section", "table", "code_block", "full_page"

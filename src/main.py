@@ -10,7 +10,13 @@ from rich.console import Console
 from rich.logging import RichHandler
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
-from src.config import INDEXABLE_SOURCES, MODULE_DEFINITIONS, Settings, SourceType
+from src.config import (
+    INDEXABLE_SOURCES,
+    MODULE_DEFINITIONS,
+    USER_DOC_DEFINITIONS,
+    Settings,
+    SourceType,
+)
 
 app = typer.Typer(
     name="document-automation",
@@ -217,6 +223,70 @@ def stats(verbose: bool = typer.Option(False, "--verbose", "-v")):
     console.print(f"  Total documents: {s['total_documents']}")
     console.print(f"  Persist dir: {settings.chroma_persist_dir}")
     console.print(f"  Collection: {settings.chroma_collection_name}")
+
+
+@app.command()
+def generate_user_guide(
+    module: Optional[str] = typer.Option(
+        None, help="Generate specific user guide chapter (e.g., chart-settings). Default: all chapters.",
+    ),
+    verbose: bool = typer.Option(False, "--verbose", "-v"),
+):
+    """Generate user-facing guide documents based on existing tech docs."""
+    _setup_logging(verbose)
+    settings = _get_settings()
+
+    from src.chains.user_doc_generator import generate_user_doc
+    from src.output.writer import write_user_doc, write_user_guide_index
+
+    if module:
+        if module not in USER_DOC_DEFINITIONS:
+            console.print(f"[red]Unknown user-doc chapter: {module}[/red]")
+            console.print(f"Available chapters: {', '.join(USER_DOC_DEFINITIONS.keys())}")
+            raise typer.Exit(1)
+        chapters_to_generate = [module]
+    else:
+        chapters_to_generate = list(USER_DOC_DEFINITIONS.keys())
+
+    generated: list[str] = []
+
+    for ch_key in chapters_to_generate:
+        ch_def = USER_DOC_DEFINITIONS[ch_key]
+        console.print(f"\n[bold blue]{'='*60}[/bold blue]")
+        console.print(f"[bold]User Guide: {ch_def['title']}[/bold]")
+        console.print(f"[bold blue]{'='*60}[/bold blue]")
+
+        try:
+            console.print(f"  [dim]Source modules: {', '.join(ch_def['source_modules'])}[/dim]")
+            console.print("  [dim]Generating user guide...[/dim]")
+            content = generate_user_doc(ch_key, settings)
+
+            filepath = write_user_doc(ch_key, content, settings)
+            generated.append(ch_key)
+            console.print(f"  [green]Done: {filepath}[/green]")
+
+        except FileNotFoundError as e:
+            console.print(f"  [red]{e}[/red]")
+        except Exception as e:
+            console.print(f"  [red]Error generating user doc {ch_key}: {e}[/red]")
+            logging.exception("Failed to generate user doc %s", ch_key)
+
+    if generated:
+        write_user_guide_index(settings, generated)
+        console.print(f"\n[bold green]Successfully generated {len(generated)} user guide chapters.[/bold green]")
+    else:
+        console.print("\n[yellow]No user guide chapters were generated.[/yellow]")
+
+
+@app.command()
+def list_user_chapters():
+    """List all available user guide chapters."""
+    console.print("\n[bold]Available user guide chapters:[/bold]\n")
+    for key, ch in USER_DOC_DEFINITIONS.items():
+        sources = ", ".join(ch["source_modules"])
+        console.print(f"  [cyan]{key:25s}[/cyan] {ch['id']} - {ch['title']}")
+        console.print(f"  {'':25s} [dim]← {sources}[/dim]")
+    console.print(f"\n  Total: {len(USER_DOC_DEFINITIONS)} chapters")
 
 
 def _index_backend(settings: Settings):

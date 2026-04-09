@@ -26,7 +26,8 @@ class MultiSourceRetriever:
     ) -> list[Document]:
         """Retrieve relevant documents with optional metadata filters."""
         where_filter = self._build_filter(source_types, module_filter, doc_type_filter)
-
+        # 等价于：WHERE source_type = 'backend' ORDER BY similarity DESC LIMIT k
+        # 未使用langchain高级检索，使用chrome的相似度搜索，可优化
         if where_filter:
             results = self.store_manager.store.similarity_search(
                 query, k=k, filter=where_filter,

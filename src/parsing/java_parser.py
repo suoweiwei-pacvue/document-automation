@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class JavaChunk:
+    # 核心就是解析出如下的java的结构体对象
     chunk_type: str  # "class", "method", "interface", "enum", "field_group"
     name: str
     qualified_name: str
