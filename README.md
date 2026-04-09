@@ -177,3 +177,10 @@ python -m src.main list-user-chapters
 ## 架构
 
 详见 [ARCHITECTURE.md](ARCHITECTURE.md)
+
+## 后续优化方向
+不够智能化，通用性不够（skill->agent方向）
+- `文档目录应全基于LLM生成，非半人工制定`
+- `解析confluence 富文本格式，需要使用LLM理解图片等`
+- `缺少投喂CS的客户单，FAQ精准实用度不足`
+- `LLM不可用时的容灾`
